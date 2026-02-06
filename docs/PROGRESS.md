@@ -1,17 +1,17 @@
 # GRETA Core Progress Index
 
 ## Sync Status (2026-02-06)
-- **Local HEAD**: `df42049` ✅ (guard rail implemented)
-- **GitHub HEAD**: `df42049` ✅
-- **Remote MI300X**: `df42049` ✅ (sync-ed, stateless verified)
+- **Local HEAD**: `ff39be3` ✅ (guard rail + evidence)
+- **GitHub HEAD**: `ff39be3` ✅
+- **Remote MI300X**: `ff39be3` ✅ (sync-ed, stateless verified)
 - **AMD Reports**: 43 documents in `docs/AMD/`
-- **Artifacts Remote**: Rescued to `artifacts_remote/2026-02-06/b3_61/`
+- **Artifacts**: Logs in `artifacts_remote/2026-02-06/b3_61/run/`
 
 ## Phase Index
 
 | Phase | Date | HEAD Hash | Objective | Root Cause | Result | Artifacts | AMD Report |
 |-------|------|-----------|-----------|------------|--------|-----------|------------|
-| B3.61 | 2026-02-06 | `df42049` | Model Compatibility Guard Rail | `MODEL_DIM_MISMATCH` | **GUARD RAIL IMPLEMENTED** | N/A | [AMD_B3_61](docs/AMD/2026_02_06_B3_61_residual_stream_bisect.md) |
+| B3.61 | 2026-02-06 | `ff39be3` | Model Compatibility Guard Rail | `MODEL_DIM_MISMATCH` | **DEFENSIVE CORRECTNESS** | Logs: `p0_short.log` | [AMD_B3_61](docs/AMD/2026_02_06_B3_61_residual_stream_bisect.md) |
 | B3.59 | 2026-02-05 | `d558073` | Embedding/DebugInput audit | CLEAN | Confirmed OK | [B3.59](artifacts_remote/2026-02-05/b3_59/) | [AMD_B3_59](docs/AMD/2026_02_05_B3_59_embedding_debug_input_audit.md) |
 | B3.58 | 2026-02-05 | `d558073` | RMSNorm wiring audit | `UPSTREAM_X_MISMATCH` | X0/Ceros en decode0 | [B3.58](artifacts_remote/2026-02-04/b3_58/) | N/A |
 | B3.57.1 | 2026-02-04 | `d558073` | RMSNorm divergence | `NORMOUT_SELECTION` | Confirmed | N/A | N/A |
