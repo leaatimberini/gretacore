@@ -4,13 +4,14 @@
 - **Local HEAD**: `e09989c` ✅ (B3.61 residual stream bisect OK + B3.63 HIP D2H fix)
 - **GitHub HEAD**: `ff39be3` ⚠️ (pending push)
 - **Remote MI300X**: `e09989c` ✅ (sync-ed, stateless verified)
-- **AMD Reports**: 44 documents in `docs/AMD/`
+- **AMD Reports**: 46 documents in `docs/AMD/`
 - **Artifacts**: Full traces in `artifacts_remote/2026-02-06/b3_61/`
 
 ## Phase Index
 
 | Phase | Date | HEAD Hash | Objective | Root Cause | Result | Artifacts | AMD Report |
 |-------|------|-----------|-----------|------------|--------|-----------|------------|
+| B3.64 | 2026-02-06 | `e09989c` | Numerical Drift Audit | N/A | **READY_TO_RUN** | N/A | [AMD_B3_64](docs/AMD/2026_02_06_B3_64_numerical_drift_audit.md) |
 | B3.61 | 2026-02-06 | `e09989c` | Residual Stream Bisect | N/A | **OK** | Full traces: 3 prompts, layers 0,1,2,4,8 | [b3_61](artifacts_remote/2026-02-06/b3_61/) | [AMD_B3_61](docs/AMD/2026_02_06_B3_61_residual_stream_bisect.md) |
 | B3.62 | 2026-02-06 | `303b634` | HIP D2H Transfer Audit | `BUG_NOT_REPRODUCED` | **INSTRUMENTATION_ADDED** | [B3.62](artifacts_remote/2026-02-06/b3_62/) | [AMD_B3_62](docs/AMD/2026_02_06_B3_62_hip_d2h_transfer_audit.md) |
 | B3.63 | 2026-02-06 | `e09989c` | HIP D2H Root Cause Fix | `ASYNC_D2H_RACE` | **FIXED** | N/A | [d2h_safe.hpp](src/inference/include/gcore/inference/d2h_safe.hpp) |
