@@ -48,8 +48,15 @@ set(HIP_KERNEL_SOURCES
     ${RT_HIP_DIR}/kernels/fused_attention_kernels.hip
 )
 
-# Optional SentencePiece tokenizer
+# Optional features
 option(GRETA_USE_SENTENCEPIECE "Enable SentencePiece tokenizer" ON)
+option(GRETA_TRACE_MEMCPY "Enable D2H memcpy tracing for B3.62 audit" OFF)
+
+# Add greta_trace_memcpy.hpp include path if tracing enabled
+if(GRETA_TRACE_MEMCPY)
+    message(STATUS "GRETA_TRACE_MEMCPY enabled - D2H audit mode")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DGRETA_TRACE_MEMCPY")
+endif()
 
 # greta_infer CLI
 add_executable(greta_infer

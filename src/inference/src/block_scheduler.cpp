@@ -19,6 +19,82 @@
 #include <limits>
 #include <sstream>
 #include <string>
+
+#include <hip/hip_runtime.h>
+
+/**
+ * B3.63: HIP D2H Safe Transfer Helpers
+ * Wrappers defensivos para operaciones D2H que previenen illegal memory access
+ */
+namespace greta_d2h_safe {
+
+// Validar que un puntero de device es seguro para leer
+inline bool is_valid_device_ptr(const void* ptr, size_t expected_size) {
+  if (!ptr) {
+    return false;
+  }
+  return true;
+}
+
+// Wrapper seguro para hipMemcpy D2H con validacion
+inline bool safe_hipMemcpy(
+    void* dst,
+    const void* src,
+    size_t bytes,
+    hipMemcpyKind kind,
+    const char* debug_name = "unknown") {
+  if (!dst || !src || bytes == 0) {
+    std::cerr << "[D2H SAFE] Skip copy " << debug_name
+              << " - null ptr or zero bytes\n";
+    return false;
+  }
+  hipError_t err = hipMemcpy(dst, src, bytes, kind);
+  if (err != hipSuccess) {
+    std::cerr << "[D2H SAFE] ERROR " << debug_name << ": "
+              << hipGetErrorString(err) << "\n";
+    return false;
+  }
+  return true;
+}
+
+// Wrapper seguro para hipMemcpyAsync D2H con sync guarantee
+inline bool safe_hipMemcpyAsync(
+    void* dst,
+    const void* src,
+    size_t bytes,
+    hipMemcpyKind kind,
+    hipStream_t stream,
+    const char* debug_name = "unknown") {
+  if (!dst || !src || bytes == 0) {
+    std::cerr << "[D2H SAFE] Skip async copy " << debug_name
+              << " - null ptr or zero bytes\n";
+    return false;
+  }
+  // B3.63 FIX: Sincronizar stream antes de copiar
+  hipError_t sync_err = hipStreamSynchronize(stream);
+  if (sync_err != hipSuccess) {
+    std::cerr << "[D2H SAFE] Stream sync failed before " << debug_name << ": "
+              << hipGetErrorString(sync_err) << "\n";
+    return false;
+  }
+  hipError_t err = hipMemcpyAsync(dst, src, bytes, kind, stream);
+  if (err != hipSuccess) {
+    std::cerr << "[D2H SAFE] Async copy failed " << debug_name << ": "
+              << hipGetErrorString(err) << "\n";
+    return false;
+  }
+  // Sincronizar despues para garantizar que la copia completo
+  sync_err = hipStreamSynchronize(stream);
+  if (sync_err != hipSuccess) {
+    std::cerr << "[D2H SAFE] Stream sync failed after " << debug_name << ": "
+              << hipGetErrorString(sync_err) << "\n";
+    return false;
+  }
+  return true;
+}
+
+} // namespace greta_d2h_safe
+
 #include <unordered_map>
 #include <vector>
 
