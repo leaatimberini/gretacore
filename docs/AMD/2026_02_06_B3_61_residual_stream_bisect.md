@@ -1,128 +1,46 @@
-# B3.61: Model Compatibility Guard Rail
+# B3.61: Residual Stream Bisect
 
-**Date**: 2026-02-06
-**Commit**: `ff39be3`
-**Status**: CLOSED (Defensive Correctness Milestone)
+**Fecha**: 2026-02-06  
+**Commit**: `e09989c`  
+**Modelo**: greta-v1.gguf (Llama-2-7B compatible)  
+**Binary**: `tools/inference/greta_infer` (con fix B3.63)
 
-## Execution Evidence (2026-02-06)
+## Resumen
 
-### Remote Execution Log
-```
-Configuration:
-  Model: models/greta-v1.gguf
-  
-[GRETA_RT] Initializing HIP Context...
-[GRETA_RT] Found 1 HIP device(s). Selecting device 0...
-[GRETA_RT] Context initialized successfully
-Model: Llama-2-7B (6.73815B params)
-[GRETA_MAIN] Initializing scheduler...
-[GRETA_SCHED] Creating stream...
-[GRETA_SCHED] Stream created successfully
-[GRETA_MAIN] Initialized scheduler for 32 layers
-Allocating buffers...
-Buffers allocated
+B3.61 ejecuta residual stream bisect para verificar integridad de trazas. Esta ejecución confirma que el fix B3.63 (wrappers seguros para `hipMemcpyAsync`) resuelve el problema de illegal memory access en transferencias D2H.
 
-Loading weights from: models/greta-v1.gguf
-[GRETA_SCHED] Starting weight load (INT8 Mode: OFF)
-[GRETA_SCHED] Loading layer 0/32...
-[GRETA_SCHED] Loading layer 8/32...
-[GRETA_SCHED] Loading layer 16/32...
-[GRETA_SCHED] Loading layer 24/32...
-Weights loaded and config updated (vocab size: 128256)
-```
+## Configuración
 
-**VERIFIED**: Model `greta-v1.gguf` (Llama-2-7B compatible) was correctly loaded.
+- **Prompts**: p0_short, p6_len_16, p6_len_32
+- **Layers**: 0, 1, 2, 4, 8
+- **Max tokens**: 5
 
-### Runtime Error (Separate Issue)
-```
-Generation error: hipMemcpy D2H failed: an illegal memory access was encountered
-```
+## Resultados de Ejecución
 
-**Note**: This is a separate runtime HIP bug, not related to model compatibility.
-The guard rail successfully validated the model before inference began.
+| Prompt | Prompt Tokens | Gen Tokens | Status | Tokens/sec |
+|--------|---------------|------------|--------|------------|
+| p0_short | 4 | 5 | OK ✓ | 16.15 |
+| p6_len_16 | 343 | 5 | OK ✓ | 4.07 |
+| p6_len_32 | 344 | 5 | OK ✓ | 4.06 |
 
----
+## Dependencias
 
-## Executive Summary
+- **B3.63**: HIP D2H Fix - Wrappers seguros para 13 llamadas `hipMemcpyAsync`
+  - Archivo: [`src/inference/include/gcore/inference/d2h_safe.hpp`](src/inference/include/gcore/inference/d2h_safe.hpp)
+  - Root cause: Race condition async D2H
 
-B3.61 was initiated to execute residual stream bisect on MI300X. During investigation, a **model architecture mismatch** was discovered between:
-- **GRETA binary**: Compiled for Llama-2-7B (dim=4096, layers=32, hidden=11008)
-- **TinyLlama model**: dim=2048, layers=22, hidden=5632
+## Artefacts
 
-A **guard rail** was implemented to detect incompatible models and abort safely, preventing illegal GPU memory access.
+- **Traces**: [`artifacts_remote/2026-02-06/b3_61/traces/`](../../artifacts_remote/2026-02-06/b3_61/traces/)
+- **Análisis**: [`artifacts_remote/2026-02-06/b3_61/b3_61_analysis.txt`](../../artifacts_remote/2026-02-06/b3_61/b3_61_analysis.txt)
+- **Logs**: [`artifacts_remote/2026-02-06/b3_61/run/`](../../artifacts_remote/2026-02-06/b3_61/run/)
+
+## Conclusión
+
+- **FIRST_FAIL**: Ninguno - todos los prompts completados exitosamente
+- **ROOT_CAUSE**: El fix B3.63 resuelve el problema de illegal memory access en transferencias D2H
+- **RESULT**: **OK** - Residual stream bisect funcionando correctamente
 
 ---
 
-## Final Status
-
-B3.61 does not represent a pipeline failure.
-
-The observed crash (illegal memory access in RMSNorm) was traced to a **model architecture mismatch** (TinyLlama vs GRETA kernels compiled for Llama-2-7B).
-
-A guard rail was implemented to:
-- Detect incompatible models before kernel launch
-- Abort safely with a clear diagnostic
-- Prevent undefined GPU memory access
-
-This closes B3.61 as a **defensive correctness milestone**, not a functional regression.
-
----
-
-## Root Cause Analysis
-
-**ROOT CAUSE**: `MODEL_DIMENSION_MISMATCH`
-
-| Dimension | GRETA Binary (Llama-2-7B) | TinyLlama 1.1B |
-|-----------|---------------------------|----------------|
-| dim       | 4096 | 2048 |
-| num_layers | 32 | 22 |
-| hidden_dim | 11008 | 5632 |
-| num_heads | 32 | 16 |
-
----
-
-## Guard Rail Implementation
-
-Added model compatibility validation in `tools/inference/src/greta_infer.cpp` that:
-1. Validates model dimensions (dim, num_layers, hidden_dim, num_heads) before kernel launch
-2. Aborts with clear error message if model is incompatible
-3. Uses `realpath()` to resolve symlinks and detect actual model file
-
-### Guard Rail Output (Test with TinyLlama)
-
-```
-[GUARD_RAIL] Validating model compatibility...
-[GUARD_RAIL_ERROR] dim mismatch!
-  Expected: 4096
-  Got:      2048
-[GUARD_RAIL_ERROR] num_layers mismatch!
-  Expected: 32
-  Got:      22
-[GUARD_RAIL_ERROR] hidden_dim mismatch!
-  Expected: 11008
-  Got:      5632
-[GUARD_RAIL] Model path (realpath): /root/models/tinyllama/tinyllama.gguf
-
-[GUARD_RAIL_FATAL] Model incompatible with GRETA kernels!
-GRETA binary was compiled with hardcoded tensor dimensions
-for Llama-2-7B (dim=4096, heads=32, layers=32).
-Running a different architecture will cause illegal memory
-access in kernels (RMSNorm, attention, etc.).
-
-Solutions:
-  1. Use greta-v1.gguf (Llama-2-7B compatible)
-  2. Recompile GRETA with dynamic shape support
-  3. Use a model matching GRETA's expected dimensions
-```
-
----
-
-## Next Steps
-
-1. Execute residual stream bisect using greta-v1.gguf (Llama-2-7B compatible)
-2. Or recompile GRETA with dynamic shape support for TinyLlama
-
----
-
-Signed:
-L.E.T / Leandro Emanuel Timberini
+**Signed**: L.E.T / Leandro Emanuel Timberini

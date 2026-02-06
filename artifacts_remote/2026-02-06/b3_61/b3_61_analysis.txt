@@ -1,0 +1,54 @@
+================================================================================
+B3.61 RESIDUAL STREAM BISECT ANALYSIS (CON B3.63 HIP D2H FIX)
+================================================================================
+Date: 2026-02-06
+Commit: e09989c B3.63: HIP D2H fix - safe wrappers (13 hipMemcpyAsync replaced)
+Binary: tools/inference/greta_infer (749KB, compilado con fix)
+
+================================================================================
+EXECUTION RESULTS
+================================================================================
+
+--- p0_short ---
+Prompt tokens: 4
+Generated tokens: 5
+Total time: 309.676 ms
+Time to first token: 70.1824 ms
+Tokens/second: 16.1459
+STATUS: OK ✓
+
+--- p6_len_16 ---
+Prompt tokens: 343
+Generated tokens: 5
+Total time: 1227.32 ms
+Time to first token: 936.454 ms
+Tokens/second: 4.07393
+STATUS: OK ✓
+
+--- p6_len_32 ---
+Prompt tokens: 344
+Generated tokens: 5
+Total time: 1231.59 ms
+Time to first token: 939.38 ms
+Tokens/second: 4.05978
+STATUS: OK ✓
+
+================================================================================
+GRETA_TRACE_D2H ACTIVITY (CON FIX)
+================================================================================
+Todos los prompts muestran traces D2H exitosos:
+- tensor=logits: hipMemcpyAsync con wrapper safe
+- tensor=hidden: hipMemcpyAsync con wrapper safe
+- No se observan errores HIP D2H
+
+================================================================================
+CONCLUSION
+================================================================================
+FIRST_FAIL: Ninguno - todos los prompts completados exitosamente
+ROOT_CAUSE: El fix B3.63 (wrappers seguros para 13 hipMemcpyAsync) resuelve
+           el problema de illegal memory access en transferencias D2H.
+
+VERIFICACIÓN: Binary compilado con fix B3.63 funciona correctamente en MI300X.
+              Los traces D2H se completan sin errores.
+
+================================================================================
