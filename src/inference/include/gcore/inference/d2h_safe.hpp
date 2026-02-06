@@ -74,7 +74,7 @@ inline bool safe_hipMemcpy(
       return true;
     }
     
-    if (err == hipErrorIllegalMemoryAccess) {
+    if (err == hipErrorIllegalAddress) {
       std::cerr << "[D2H SAFE] Illegal memory access on " << debug_name
                 << " (attempt " << (retry + 1) << "/" << MAX_RETRIES << ")\n";
       // Small delay to allow GPU state to stabilize
