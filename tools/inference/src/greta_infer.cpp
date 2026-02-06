@@ -6,9 +6,11 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <cerrno>
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <unistd.h>
 
 void print_usage() {
   std::cout
@@ -128,6 +130,77 @@ int main(int argc, char *argv[]) {
       config.num_heads_kv = config.num_heads;
     if (config.num_heads > 0)
       config.head_dim = config.dim / config.num_heads;
+  }
+
+  // =========================================================================
+  // GUARD RAIL: Validar compatibilidad del modelo con kernels GRETA
+  // =========================================================================
+  // GRETA binaries están especializados para arquitecturas específicas.
+  // Si el modelo no coincide, abortamos con error explícito en lugar de
+  // crash en kernels (illegal memory access).
+  if (!model_path.empty()) {
+    std::cout << "\n[GUARD_RAIL] Validating model compatibility...\n";
+    
+    // Valores esperados para GRETA v1 (basado en Llama-2-7B)
+    const uint32_t EXPECTED_DIM = 4096;
+    const uint32_t EXPECTED_NUM_HEADS = 32;
+    const uint32_t EXPECTED_NUM_LAYERS = 32;
+    const uint32_t EXPECTED_HEAD_DIM = 128;
+    const uint32_t EXPECTED_HIDDEN_DIM = 11008;
+    
+    bool mismatch = false;
+    
+    if (config.dim != EXPECTED_DIM) {
+      std::cerr << "[GUARD_RAIL_ERROR] dim mismatch!\n";
+      std::cerr << "  Expected: " << EXPECTED_DIM << "\n";
+      std::cerr << "  Got:      " << config.dim << "\n";
+      mismatch = true;
+    }
+    
+    if (config.num_heads != EXPECTED_NUM_HEADS) {
+      std::cerr << "[GUARD_RAIL_ERROR] num_heads mismatch!\n";
+      std::cerr << "  Expected: " << EXPECTED_NUM_HEADS << "\n";
+      std::cerr << "  Got:      " << config.num_heads << "\n";
+      mismatch = true;
+    }
+    
+    if (config.num_layers != EXPECTED_NUM_LAYERS) {
+      std::cerr << "[GUARD_RAIL_ERROR] num_layers mismatch!\n";
+      std::cerr << "  Expected: " << EXPECTED_NUM_LAYERS << "\n";
+      std::cerr << "  Got:      " << config.num_layers << "\n";
+      mismatch = true;
+    }
+    
+    if (config.hidden_dim != EXPECTED_HIDDEN_DIM) {
+      std::cerr << "[GUARD_RAIL_ERROR] hidden_dim mismatch!\n";
+      std::cerr << "  Expected: " << EXPECTED_HIDDEN_DIM << "\n";
+      std::cerr << "  Got:      " << config.hidden_dim << "\n";
+      mismatch = true;
+    }
+    
+    // Resolver path real (seguir symlinks)
+    char real_path[PATH_MAX];
+    if (realpath(model_path.c_str(), real_path) != nullptr) {
+      std::cout << "[GUARD_RAIL] Model path (realpath): " << real_path << "\n";
+    } else {
+      std::cerr << "[GUARD_RAIL_WARNING] Could not resolve realpath: " 
+                << strerror(errno) << "\n";
+    }
+    
+    if (mismatch) {
+      std::cerr << "\n[GUARD_RAIL_FATAL] Model incompatible with GRETA kernels!\n";
+      std::cerr << "GRETA binary was compiled with hardcoded tensor dimensions\n";
+      std::cerr << "for Llama-2-7B (dim=4096, heads=32, layers=32).\n";
+      std::cerr << "Running a different architecture will cause illegal memory\n";
+      std::cerr << "access in kernels (RMSNorm, attention, etc.).\n\n";
+      std::cerr << "Solutions:\n";
+      std::cerr << "  1. Use greta-v1.gguf (Llama-2-7B compatible)\n";
+      std::cerr << "  2. Recompile GRETA with dynamic shape support\n";
+      std::cerr << "  3. Use a model matching GRETA's expected dimensions\n\n";
+      return 1;
+    }
+    
+    std::cout << "[GUARD_RAIL] Model passed compatibility check.\n";
   }
 
   std::cout << "Model config: layers=" << config.num_layers
