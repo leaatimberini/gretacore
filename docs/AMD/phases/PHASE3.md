@@ -3,15 +3,27 @@
 **Start Date:** 2026-01-XX  
 **Hardware:** AMD MI300X  
 **Status:** IN PROGRESS  
-**Current Branch:** `b3_59_embedding_debug_input_audit`
+**Current Milestone:** B3.60 Attention Block Bisect
 
 ---
+
 
 ## Executive Summary
 
-Phase 3 focuses on optimizing GRETA CORE for AMD MI300X hardware, addressing precision issues, and validating the full inference pipeline.
+Phase 3 focuses on optimizing GRETA CORE for AMD MI300X hardware, addressing precision issues, and validating the full inference pipeline. All architectural decisions originate from **Leandro Emanuel Timberini**, Founder & Principal Systems Architect.
 
 ---
+
+
+## Authorship
+
+**Leandro Emanuel Timberini**
+- Founder & Principal Systems Architect
+- All architectural decisions originate from this authorship
+- Long-term vision and foundational principles defined by the founder
+
+---
+
 
 ## Objectives
 
@@ -21,6 +33,7 @@ Phase 3 focuses on optimizing GRETA CORE for AMD MI300X hardware, addressing pre
 4. **Reproducibility**: Document all experiments and results
 
 ---
+
 
 ## Completed Milestones
 
@@ -35,21 +48,24 @@ Phase 3 focuses on optimizing GRETA CORE for AMD MI300X hardware, addressing pre
 | Full Pipeline Acceptance | B3.37 | ✅ DONE | 2026-02-03 |
 | FFN RMSNorm Root Cause | B3.42 | ✅ DONE | 2026-02-03 |
 | Embedding Audit | B3.59 | ✅ DONE | 2026-02-05 |
+| **Attention Block Bisect** | **B3.60** | ✅ **DONE** | **2026-02-06** |
 
 ---
 
-## Current Focus (B3.59)
 
-**Task:** Embedding/DebugInput Audit  
+## Current Focus (B3.60)
+
+**Task:** Attention Block Bisect Audit  
 **Status:** ✅ COMPLETED  
-**Result:** No zeroing found - perfect hash match between prefill/decode
+**Result:** 3/3 tokens PASS - Attention block pipeline verified
 
 ### Technical Details
-- **Flags Used:** `GRETA_TRACE_STAGE=1`, `GRETA_TRACE_STAGE_DEBUG_INPUT=1`
-- **Issue:** Ambiguity in `embedding_out/x_in` reporting
-- **Solution:** Standardized `StageTrace` metadata (`token_id`, `route`)
+- **Trace Points:** embedding_out → attn_block_in → attn_rms_in → q_pre_rope → q_post_rope → kv_cache_fp → attn_out → residual_out
+- **Validation:** No precision degradation detected
+- **Artifacts:** `artifacts_remote/2026-02-05/b3_59/traces/`
 
 ---
+
 
 ## Architecture Components Addressed
 
@@ -62,6 +78,7 @@ Phase 3 focuses on optimizing GRETA CORE for AMD MI300X hardware, addressing pre
 - QKV projection isolation (B3.31)
 - Attention decode isolation (B3.20)
 - MFMA fix acceptance (B3.21)
+- Attention block bisect (B3.60)
 
 ### 3. LMHead ✅
 - Route isolation (B3.14)
@@ -78,11 +95,13 @@ Phase 3 focuses on optimizing GRETA CORE for AMD MI300X hardware, addressing pre
 
 ---
 
+
 ## Next Steps
 
-1. **B3.60**: TBD - Next optimization task
-2. **Performance Benchmarking**: Full pipeline performance validation
+1. **Phase 3.1**: Performance benchmarking and optimization
+2. **Phase 4 Planning**: Long-term roadmap development
 3. **Documentation**: Complete Phase 3 technical report
+
 
 ---
 
@@ -90,11 +109,13 @@ Phase 3 focuses on optimizing GRETA CORE for AMD MI300X hardware, addressing pre
 
 | Artifact | Location | Associated Reports |
 |----------|----------|-------------------|
+| B3.60 Traces | `artifacts_remote/2026-02-05/b3_59/traces/` | B3.60 |
 | B3.59 Analysis | `artifacts_remote/2026-02-05/b3_59/` | B3.59 |
 | B3.42 Analysis | `artifacts_remote/2026-02-04/b3_58/` | B3.58 |
 | B3.37 Pipeline | `artifacts_remote/2026-02-03/` | B3.37 |
 
 ---
+
 
 ## Related Documentation
 
@@ -106,6 +127,7 @@ Phase 3 focuses on optimizing GRETA CORE for AMD MI300X hardware, addressing pre
 
 ---
 
+
 ## Hardware Specifications
 
 | Component | Specification |
@@ -116,5 +138,7 @@ Phase 3 focuses on optimizing GRETA CORE for AMD MI300X hardware, addressing pre
 
 ---
 
+
 *Maintained by: Leandro Emanuel Timberini*  
+*Founder & Principal Systems Architect*  
 *Last Updated: 2026-02-06*
