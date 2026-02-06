@@ -1,5 +1,7 @@
 #include "gcore/inference/stage_trace.hpp"
 
+#include "gcore/inference/d2h_safe.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
@@ -215,9 +217,8 @@ void stage_trace_tensor(const char *point, const char *phase,
       std::min<uint32_t>(cfg.sample, static_cast<uint32_t>(stride_elems));
   std::vector<float> host(sample_n, 0.0f);
   if (sample_n > 0) {
-    hipMemcpyAsync(host.data(), ptr, sample_n * sizeof(float),
-                   hipMemcpyDeviceToHost, stream);
-    hipStreamSynchronize(stream);
+    greta_d2h_safe::safe_hipMemcpyAsync(host.data(), ptr, sample_n * sizeof(float),
+                   hipMemcpyDeviceToHost, stream, "stage_trace_post_wo");
   }
   const F32Stats stats = stats_f32(host.data(), host.size());
   const uint64_t hash = hash_f32(host.data(), host.size());

@@ -138,7 +138,17 @@ int main(int argc, char *argv[]) {
   // GRETA binaries están especializados para arquitecturas específicas.
   // Si el modelo no coincide, abortamos con error explícito en lugar de
   // crash en kernels (illegal memory access).
-  if (!model_path.empty()) {
+  // 
+  // Para debugging B3.62, usar GRETA_DISABLE_GUARD_RAIL=1 para saltar validación
+  const char* disable_guard = getenv("GRETA_DISABLE_GUARD_RAIL");
+  bool guard_disabled = (disable_guard && strcmp(disable_guard, "1") == 0);
+  
+  if (guard_disabled) {
+    std::cout << "\n[GUARD_RAIL] WARNING: Guard rail DISABLED via GRETA_DISABLE_GUARD_RAIL\n";
+    std::cout << "[GUARD_RAIL] Continuing with potentially incompatible model...\n";
+  }
+  
+  if (!model_path.empty() && !guard_disabled) {
     std::cout << "\n[GUARD_RAIL] Validating model compatibility...\n";
     
     // Valores esperados para GRETA v1 (basado en Llama-2-7B)
