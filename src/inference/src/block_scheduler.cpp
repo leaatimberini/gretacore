@@ -2882,9 +2882,9 @@ bool BlockScheduler::execute_layer(size_t layer_idx, size_t seq_start,
             attn_out + static_cast<size_t>(stage_token_index) * D;
         const float *wo_vec =
             mlp_out + static_cast<size_t>(stage_token_index) * D;
-        hipError_t err_a = greta_d2h_safe::safe_hipMemcpy(attn_out_host.data(), attn_vec,
+        bool err_a = greta_d2h_safe::safe_hipMemcpy(attn_out_host.data(), attn_vec,
                                      D * sizeof(float), hipMemcpyDeviceToHost, "mlp_attn_out");
-        hipError_t err_b = greta_d2h_safe::safe_hipMemcpy(wo_out_host.data(), wo_vec,
+        bool err_b = greta_d2h_safe::safe_hipMemcpy(wo_out_host.data(), wo_vec,
                                      D * sizeof(float), hipMemcpyDeviceToHost, "mlp_wo_out");
         if (!err_a || !err_b) {
           attn_out_host.clear();
