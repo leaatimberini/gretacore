@@ -1,0 +1,68 @@
+# B3.64 Analysis Report
+
+## Run Information
+- **Date**: 2026-02-06
+- **Hash**: 99d60d5
+- **Status**: RUN_FAILED - Invalid artifacts for numerical drift analysis
+- **Binary**: FIXED binary
+- **Model**: greta-v1.gguf
+
+## Artifacts Status
+- **Run logs**: 3 logs present (p0_short.log, p6_len_16.log, p6_len_32.log)
+- **Traces**: EMPTY - no trace files generated
+- **Checkpoints**: Empty directory
+
+## Log Analysis
+
+### p0_short.log
+```
+Generation error: hipMemcpy D2H failed: an illegal memory access was encountered
+```
+- **Status**: FAILED
+- **Error**: Memory access violation during device-to-host transfer
+
+### p6_len_16.log
+```
+Failed to open model: models/greta-v1.gguf
+```
+- **Status**: FAILED
+- **Error**: Invalid model path (relative instead of absolute)
+
+### p6_len_32.log
+```
+Failed to open model: models/greta-v1.gguf
+```
+- **Status**: FAILED
+- **Error**: Invalid model path (relative instead of absolute)
+
+## Root Cause Analysis
+
+### Root Cause 1: Model Path Configuration
+- **File**: Remote execution script
+- **Issue**: Using relative path `models/greta-v1.gguf` instead of absolute `/root/gretacore/models/greta-v1.gguf`
+- **Affected**: p6_len_16, p6_len_32
+
+### Root Cause 2: Memory Access Violation
+- **File**: Binary or runtime
+- **Issue**: `hipMemcpy D2H failed: an illegal memory access`
+- **Affected**: p0_short
+- **Context**: Memory management issue in D2H (Device-to-Host) transfer
+
+## FIRST_FAIL
+- **Location**: Remote execution configuration
+- **Issue**: Model path not properly set for all prompts
+
+## ROOT_CAUSE
+Multiple configuration issues prevented successful execution:
+1. Model path errors in remote script
+2. Memory access violations in binary
+
+## Recommendations
+1. Fix model path to use absolute paths consistently
+2. Investigate hipMemcpy D2H memory access issue
+3. Re-run B3.64 with corrected configuration
+4. Verify traces are generated before packaging artifacts
+
+## Conclusion
+**Status**: N/A - Cannot verify numerical drift without valid traces
+**Action Required**: Re-run B3.64 with fixed configuration
