@@ -1,5 +1,7 @@
 #include "gcore/inference/layer_trace.hpp"
 
+#include "gcore/inference/d2h_safe.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -214,11 +216,8 @@ void LayerTracer::trace_tensor(const char *tag, int step, int layer,
     return;
 
   std::vector<float> host(n);
-  if (hipMemcpyAsync(host.data(), d, n * sizeof(float), hipMemcpyDeviceToHost,
-                     stream) != hipSuccess) {
-    return;
-  }
-  hipStreamSynchronize(stream);
+  greta_d2h_safe::safe_hipMemcpyAsync(host.data(), d, n * sizeof(float), hipMemcpyDeviceToHost,
+                     stream, "layer_trace_f32");
 
   F32Stats s = stats_f32(host.data(), n);
   uint64_t h = hash_f32(host.data(), n);
@@ -251,11 +250,8 @@ void LayerTracer::trace_tensor_f16(const char *tag, int step, int layer,
     return;
 
   std::vector<__half> host_half(n);
-  if (hipMemcpyAsync(host_half.data(), d, n * sizeof(__half),
-                     hipMemcpyDeviceToHost, stream) != hipSuccess) {
-    return;
-  }
-  hipStreamSynchronize(stream);
+  greta_d2h_safe::safe_hipMemcpyAsync(host_half.data(), d, n * sizeof(__half),
+                     hipMemcpyDeviceToHost, stream, "layer_trace_f16");
 
   std::vector<float> host(n);
   for (uint32_t i = 0; i < n; ++i) {

@@ -1081,9 +1081,8 @@ static void post_wo_trace_tensor(const char *point, const char *phase,
       std::min<uint32_t>(post_wo_sample(), static_cast<uint32_t>(stride_elems));
   std::vector<float> host(sample_n, 0.0f);
   if (sample_n > 0) {
-    hipMemcpyAsync(host.data(), ptr, sample_n * sizeof(float),
-                   hipMemcpyDeviceToHost, stream);
-    hipStreamSynchronize(stream);
+    greta_d2h_safe::safe_hipMemcpyAsync(host.data(), ptr, sample_n * sizeof(float),
+                   hipMemcpyDeviceToHost, stream, "post_wo_trace");
   }
   const F32Stats stats = stats_f32(host.data(), host.size());
   const uint64_t hash = hash_f32(host.data(), host.size());
@@ -1142,13 +1141,13 @@ static void trace_rmsnorm(
   std::vector<float> out_host(sample_n, 0.0f);
   std::vector<float> w_host(sample_n, 0.0f);
   if (sample_n > 0) {
-    hipMemcpyAsync(in_host.data(), in_ptr, sample_n * sizeof(float),
-                   hipMemcpyDeviceToHost, stream);
-    hipMemcpyAsync(out_host.data(), out_ptr, sample_n * sizeof(float),
-                   hipMemcpyDeviceToHost, stream);
+    greta_d2h_safe::safe_hipMemcpyAsync(in_host.data(), in_ptr, sample_n * sizeof(float),
+                   hipMemcpyDeviceToHost, stream, "rmsnorm_trace_in");
+    greta_d2h_safe::safe_hipMemcpyAsync(out_host.data(), out_ptr, sample_n * sizeof(float),
+                   hipMemcpyDeviceToHost, stream, "rmsnorm_trace_out");
     if (weight.data()) {
-      hipMemcpyAsync(w_host.data(), weight.data(), sample_n * sizeof(float),
-                     hipMemcpyDeviceToHost, stream);
+      greta_d2h_safe::safe_hipMemcpyAsync(w_host.data(), weight.data(), sample_n * sizeof(float),
+                     hipMemcpyDeviceToHost, stream, "rmsnorm_trace_weight");
     }
     hipStreamSynchronize(stream);
   }
@@ -2347,34 +2346,34 @@ bool BlockScheduler::execute_layer(size_t layer_idx, size_t seq_start,
         if (want_norm && norm_sample > 0) {
           norm_in_host.assign(norm_sample, 0.0f);
           const float *x_token = x + static_cast<size_t>(token_index_used) * D;
-          hipMemcpyAsync(norm_in_host.data(), x_token,
+          greta_d2h_safe::safe_hipMemcpyAsync(norm_in_host.data(), x_token,
                          norm_sample * sizeof(float), hipMemcpyDeviceToHost,
-                         hip_stream);
+                         hip_stream, "attention_norm_in");
           if (!use_fused) {
             norm_out_valid = true;
             norm_out_host.assign(norm_sample, 0.0f);
             const float *norm_token =
                 norm_out + static_cast<size_t>(token_index_used) * D;
-            hipMemcpyAsync(norm_out_host.data(), norm_token,
+            greta_d2h_safe::safe_hipMemcpyAsync(norm_out_host.data(), norm_token,
                            norm_sample * sizeof(float), hipMemcpyDeviceToHost,
-                           hip_stream);
+                           hip_stream, "attention_norm_out");
           }
         }
 
-        hipMemcpyAsync(q_host.data(), q_head, Dh * sizeof(float),
-                       hipMemcpyDeviceToHost, hip_stream);
-        hipMemcpyAsync(k_host.data(), k_head_base,
+        greta_d2h_safe::safe_hipMemcpyAsync(q_host.data(), q_head, Dh * sizeof(float),
+                       hipMemcpyDeviceToHost, hip_stream, "attention_q");
+        greta_d2h_safe::safe_hipMemcpyAsync(k_host.data(), k_head_base,
                        static_cast<size_t>(seq_len_used) * Dh * sizeof(float),
-                       hipMemcpyDeviceToHost, hip_stream);
-        hipMemcpyAsync(v_host.data(), v_head_base,
+                       hipMemcpyDeviceToHost, hip_stream, "attention_k");
+        greta_d2h_safe::safe_hipMemcpyAsync(v_host.data(), v_head_base,
                        static_cast<size_t>(seq_len_used) * Dh * sizeof(float),
-                       hipMemcpyDeviceToHost, hip_stream);
+                       hipMemcpyDeviceToHost, hip_stream, "attention_v");
 
         const float *attn_token =
             attn_out + static_cast<size_t>(token_index_used) * D;
         const float *attn_head = attn_token + head * Dh;
-        hipMemcpyAsync(attn_host.data(), attn_head, Dh * sizeof(float),
-                       hipMemcpyDeviceToHost, hip_stream);
+        greta_d2h_safe::safe_hipMemcpyAsync(attn_host.data(), attn_head, Dh * sizeof(float),
+                       hipMemcpyDeviceToHost, hip_stream, "attention_attn");
         hipStreamSynchronize(hip_stream);
 
         const float *k_vec =
@@ -4107,11 +4106,8 @@ bool BlockScheduler::execute_layer(size_t layer_idx, size_t seq_start,
         if (!d || n == 0)
           return false;
         std::vector<float> host(n);
-        if (hipMemcpyAsync(host.data(), d, n * sizeof(float),
-                           hipMemcpyDeviceToHost, hip_stream) != hipSuccess) {
-          return false;
-        }
-        hipStreamSynchronize(hip_stream);
+        greta_d2h_safe::safe_hipMemcpyAsync(host.data(), d, n * sizeof(float),
+                           hipMemcpyDeviceToHost, hip_stream, "attention_output_trace");
         *stats = stats_f32(host.data(), n);
         *hash = hash_f32(host.data(), n);
         return true;
