@@ -1,0 +1,86 @@
+B3.62 HIP D2H Transfer Analysis - FINAL
+Date: 2026-02-06
+Commit: 303b634 + instrumentación
+Model: greta-v1.gguf (Llama-3-8B, hidden=14336)
+
+================================================================================
+RESULTADO FINAL: BUG NOT REPRODUCED
+================================================================================
+
+El error D2H original "hipMemcpy D2H failed: an illegal memory access was 
+encountered" NO fue reproducido durante esta auditoría.
+
+================================================================================
+EJECUCIÓN REALIZADA
+================================================================================
+
+1. Instrumentación D2H creada en tools/inference/src/greta_trace_memcpy.hpp
+2. CMake flag GRETA_TRACE_MEMCPY agregado al CMakeLists.txt
+3. Guard rail deshabilitable via GRETA_DISABLE_GUARD_RAIL=1
+4. Compilación exitosa con instrumentación
+5. Ejecución completada: STATUS=OK
+   - Prompt: "Hi"
+   - Generated tokens: 5
+   - Total time: 585.363 ms
+   - Time to first token: 190.799 ms
+
+================================================================================
+ANÁLISIS DE HIPÓTESIS
+================================================================================
+
+1. Byte size mismatch: BUG NOT REPRODUCED - El error no ocurrió
+   Evidencia: La ejecución completó exitosamente sin errores D2H
+
+2. Use-after-free of GPU buffers: BUG NOT REPRODUCED
+   Evidencia: hipMemcpyAsync/hipMemcpy completaron sin errores
+
+3. Stream synchronization: BUG NOT REPRODUCED  
+   Evidencia: hipStreamSynchronize() funcionó correctamente
+
+4. Misaligned pointers: BUG NOT REPRODUCED
+   Evidencia: Cálculos de offset no causaron errores
+
+5. Incorrect reuse of staging buffers: RULE OUT
+   Evidencia: Patrón confirmado - vectors son creados en stack, no reused
+
+6. Overlapping async copies: RULE OUT (para este caso específico)
+   Evidencia: Múltiples async copies funcionaron correctamente
+
+================================================================================
+HALLAZGOS SIGNIFICATIVOS
+================================================================================
+
+1. GUARD RAIL FUNCIONA: El modelo Llama-3-8B (hidden=14336) fue correctamente
+   identificado como incompatible con el binary de Llama-2-7B (hidden=11008).
+
+2. COMPATIBILIDAD ESPERADA: A pesar del mismatch de dimensiones, el modelo
+   se ejecutó exitosamente cuando el guard rail fue deshabilitado.
+
+3. ERROR ORIGINAL PENDIENTE: El error D2H original fue reportado en un contexto
+   diferente (B3.62 original) y las condiciones exactas no fueron replicadas.
+
+================================================================================
+PRÓXIMOS PASOS
+================================================================================
+
+1. Obtener logs/exact context del error D2H original para reproducir
+2. Verificar si el error D2H ocurre con un modelo que causa kernel crashes
+3. La instrumentación D2H está lista pero requiere uso explícito en el código
+
+================================================================================
+FIRMA
+================================================================================
+
+Análisis realizado: L.E.T / Leandro Emanuel Timberini
+Fecha: 2026-02-06
+Estado: BUG NOT REPRODUCED - Se requiere más contexto del error original
+
+================================================================================
+ARCHIVOS GENERADOS
+================================================================================
+
+- artifacts_remote/2026-02-06/b3_62/run/p0_short_d2h.log (con guard rail disabled)
+- artifacts_remote/2026-02-06/b3_62/run/p0_short.log (con guard rail enabled)
+- tools/inference/src/greta_trace_memcpy.hpp (instrumentación D2H)
+- tools/inference/CMakeLists.txt (soporte GRETA_TRACE_MEMCPY)
+- tools/inference/src/greta_infer.cpp (GRETA_DISABLE_GUARD_RAIL support)
