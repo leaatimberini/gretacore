@@ -1,0 +1,11 @@
+#!/bin/bash
+# Git post-commit hook for GRETA CORE
+# Agrega metadatos de autoría a documentos Markdown
+
+# Solo ejecutar si hay archivos .md modificados
+if git diff --name-only HEAD~1 | grep -q "\.md$"; then
+    echo "Running metadata hook for Markdown files..."
+    python3 .git/metadata_hook.py
+fi
+
+exit 0
