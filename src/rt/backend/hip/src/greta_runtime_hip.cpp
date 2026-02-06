@@ -1,4 +1,5 @@
 #include "gcore/rt/hip/greta_runtime_hip.hpp"
+#include "gcore/inference/d2h_safe.hpp"
 #include <iostream>
 
 namespace gcore::rt::hip {
@@ -37,7 +38,7 @@ bool GretaMemoryHip::copy_from_host(const void *src, size_t size) {
 bool GretaMemoryHip::copy_to_host(void *dst, size_t size) const {
   if (!ptr_ || size > size_)
     return false;
-  return hipMemcpy(dst, ptr_, size, hipMemcpyDeviceToHost) == hipSuccess;
+  return greta_d2h_safe::safe_hipMemcpy(dst, ptr_, size, hipMemcpyDeviceToHost, "greta_runtime_copy_to_host");
 }
 
 // --- GretaEventHip ---

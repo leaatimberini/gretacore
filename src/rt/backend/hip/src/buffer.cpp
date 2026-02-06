@@ -1,4 +1,5 @@
 #include "gcore/rt/hip/buffer.hpp"
+#include "gcore/inference/d2h_safe.hpp"
 
 #include <hip/hip_runtime.h>
 
@@ -55,10 +56,10 @@ bool Buffer::copy_to_device(const void *host_ptr, size_t size,
 }
 
 bool Buffer::copy_to_host(void *host_ptr, size_t size, std::string *err) const {
-  hipError_t res = hipMemcpy(host_ptr, ptr_, size, hipMemcpyDeviceToHost);
-  if (res != hipSuccess) {
+  hipError_t res = greta_d2h_safe::safe_hipMemcpy(host_ptr, ptr_, size, hipMemcpyDeviceToHost, "buffer_copy_to_host");
+  if (!res) {
     if (err)
-      *err = "hipMemcpy D2H failed: " + std::string(hipGetErrorString(res));
+      *err = "hipMemcpy D2H failed";
     return false;
   }
   return true;
@@ -74,10 +75,10 @@ bool Buffer::copy_to_host_offset(void *host_ptr, size_t offset, size_t size,
     return false;
   }
   char *device_ptr = static_cast<char *>(ptr_) + offset;
-  hipError_t res = hipMemcpy(host_ptr, device_ptr, size, hipMemcpyDeviceToHost);
-  if (res != hipSuccess) {
+  hipError_t res = greta_d2h_safe::safe_hipMemcpy(host_ptr, device_ptr, size, hipMemcpyDeviceToHost, "buffer_copy_to_host_offset");
+  if (!res) {
     if (err)
-      *err = "hipMemcpy D2H failed: " + std::string(hipGetErrorString(res));
+      *err = "hipMemcpy D2H failed";
     return false;
   }
   return true;

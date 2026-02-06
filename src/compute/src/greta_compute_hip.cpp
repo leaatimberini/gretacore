@@ -1,4 +1,5 @@
 #include "gcore/compute/greta_compute.hpp"
+#include "gcore/inference/d2h_safe.hpp"
 #include "gcore/rt/hip/greta_runtime_hip.hpp"
 #include "gcore/rt/hip/kernels/attention_kernels.hpp"
 #include "gcore/rt/hip/kernels/fused_attention_kernels.hpp"
@@ -271,14 +272,14 @@ GretaResult GretaCompute::gemm(GretaStream *stream, GretaMemory *A,
       info.head_scales_ptr = reinterpret_cast<uintptr_t>(qinfo.head_scales);
       if (qinfo.scales) {
         float tmp[64];
-        if (hipMemcpy(tmp, qinfo.scales, sizeof(tmp), hipMemcpyDeviceToHost) == hipSuccess) {
+        if (greta_d2h_safe::safe_hipMemcpy(tmp, qinfo.scales, sizeof(tmp), hipMemcpyDeviceToHost, "compute_scales")) {
           info.scales_hash = hash_f32(tmp, 64);
         }
       }
       if (qinfo.head_scales && qinfo.num_heads > 0) {
         const size_t count = qinfo.num_heads < 64 ? qinfo.num_heads : 64;
         std::vector<float> tmp(count);
-        if (hipMemcpy(tmp.data(), qinfo.head_scales, count * sizeof(float), hipMemcpyDeviceToHost) == hipSuccess) {
+        if (greta_d2h_safe::safe_hipMemcpy(tmp.data(), qinfo.head_scales, count * sizeof(float), hipMemcpyDeviceToHost, "compute_head_scales")) {
           info.head_scales_hash = hash_f32(tmp.data(), count);
         }
       }
