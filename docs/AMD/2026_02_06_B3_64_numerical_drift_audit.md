@@ -88,4 +88,129 @@ python3 tools/benchmarks/analyze_b3_64_numerical_drift.py \
 - B3.61: Residual Stream Bisect (traces baseline)
 - B3.63: HIP D2H Fix (safe wrappers for `hipMemcpyAsync`)
 
+---
+
+## B3.64.1 D2H Illegal Memory Access Forensics (EN)
+
+### Crash Summary
+
+**Error**: `hipMemcpy D2H failed: an illegal memory access was encountered`
+
+The B3.64 numerical drift audit encountered a critical memory fault during Device-to-Host (D2H) transfer. The error indicates that the device pointer passed to `hipMemcpy` is invalid, causing an illegal memory access.
+
+### Instrumentation Implemented (D2H Safe Wrappers)
+
+Per commit `1173ae5`, D2H safe wrappers were added with debug instrumentation:
+- Logging of device pointers before D2H operations
+- Validation of pointer validity
+- Async/sync handling for HIP operations
+
+### Hypothesis Test Results
+
+| Hypothesis | Status | Description |
+|------------|--------|-------------|
+| H1: Use-after-free | **INCONCLUSIVE** | Wrappers not invoked - no free evidence |
+| H2: Incorrect offset | **INCONCLUSIVE** | Wrappers not invoked - no tracing data |
+| H3: Race condition | **FAIL** | Crash persists with sync - not a race |
+
+### Probable Root Cause
+
+**BUFFER_INVALID**: The device pointer (`src_device`) passed to `hipMemcpy` does not point to valid device memory.
+
+Likely scenarios:
+1. **Corrupted pointer**: Device pointer was overwritten or not initialized correctly
+2. **Buffer freed**: Buffer was freed (hipFree) before D2H transfer
+3. **Invalid address**: Device address was not obtained correctly from hipMalloc
+
+### Recommendations
+
+1. **Additional instrumentation**: Add pointer logging before hipMemcpy
+2. **Pointer validation**: Verify device pointer validity before D2H
+3. **Buffer lifecycle review**: Ensure buffers are not prematurely freed
+4. **HIP memory inspector**: Use AMD tools to inspect memory state
+
+### Artifact Reference
+
+Full forensics analysis: `artifacts_remote/2026-02-07/b3_64/b3_64_analysis.txt`
+
+---
+
+## B3.64.2 RoPE Kernel Launch Diagnostics (EN)
+
+### Evolution of the Issue
+
+| Stage | Date | Error | Root Cause |
+|-------|------|-------|-------------|
+| Original | 2026-02-07 | `hipMemcpy D2H failed` | Initially suspected D2H transfer |
+| Evolved | 2026-02-07 | `RoPE Q launch failed` | Error occurs BEFORE D2H - upstream kernel |
+| Current | 2026-02-07 | `RoPE Q launch failed: illegal memory access` | RoPE kernel launch fault |
+
+**Critical Finding**: The D2H safe wrapper `[D2H_SAFE_WRAPPER]` was NOT invoked. This proves the crash occurs in the kernel launch path, NOT in D2H operations.
+
+### Root Cause Analysis
+
+**Location**: `src/inference/src/block_scheduler.cpp:2083-2100`
+
+**Kernel Launch Sites Identified**:
+1. `launch_rope(hip_stream, q, S, Hq, Dh, config_.rope_base, d_pos)` - Fused KV path (line 2084)
+2. `launch_rope(hip_stream, q, S, Hq, Dh, config_.rope_base, d_pos)` - Decode path Q (line 2089)
+3. `launch_rope(hip_stream, k, S, Hkv, Dh, config_.rope_base, d_pos)` - Decode path K (line 2092)
+4. `launch_rope(hip_stream, q, S, Hq, Dh, config_.rope_base, pos)` - Prefill path Q (line 2096)
+5. `launch_rope(hip_stream, k, S, Hkv, Dh, config_.rope_base, pos)` - Prefill path K (line 2099)
+
+### Instrumentation Added (commit e3143aa)
+
+Added `greta_rope_diag::validate_rope_params()` helper with:
+
+1. **Pointer Validation**:
+   - `x_ptr` != nullptr
+   - `pos_ptr` != nullptr (for decode path with `d_pos`)
+
+2. **Dimension Validation**:
+   - `seq_len` > 0
+   - `num_heads` > 0
+   - `head_dim` > 0
+   - `head_dim` is even (RoPE requires even)
+
+3. **Configuration Validation**:
+   - `rope_base` > 0.0
+
+4. **Structured Logging**:
+   ```
+   [ROPE_DIAG] <kernel_name> x_ptr=<hex> seq_len=<n> num_heads=<n> head_dim=<n> rope_base=<f> pos_ptr=<hex> valid=<true|false>
+   ```
+
+### Hypotheses to Test
+
+| Hypothesis | Description | Test |
+|------------|-------------|------|
+| H1 | Null pointer in `q` or `d_pos` | Check `[ROPE_DIAG]` output for `x_ptr=0x0` |
+| H2 | Invalid `seq_len` (0 or unexpected) | Check `[ROPE_DIAG]` output for `seq_len=0` |
+| H3 | Invalid `rope_base` (0 or corrupted) | Check `[ROPE_DIAG]` output for `rope_base<=0` |
+| H4 | `head_dim` is odd (must be even) | Check `[ROPE_DIAG]` output for odd `head_dim` |
+| H5 | Module/kernel loading failure | Check for HIP API errors before launch |
+
+### Expected Diagnostic Output
+
+```
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7f... seq_len=1 num_heads=32 head_dim=128 rope_base=10000.0 pos_ptr=0x7f... valid=true
+```
+
+If crash occurs, the `[ROPE_DIAG]` line will show which parameter is invalid.
+
+### Next Steps
+
+1. **Run with diagnostics**: Execute `run_b3_64_mi300x.sh` to capture `[ROPE_DIAG]` output
+2. **Identify invalid parameter**: Determine which validation fails
+3. **Trace to source**: Find where invalid parameter originates
+4. **Fix or escalate**: Apply fix or create B3.65 for deeper kernel investigation
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `src/inference/src/block_scheduler.cpp` | Added `greta_rope_diag` namespace and 4 validation calls |
+
+---
+
 ## Signed: L.E.T / Leandro Emanuel Timberini
