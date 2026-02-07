@@ -1,7 +1,7 @@
 # B3.66 Prefill vs Decode Drift Probe
 
 **Date**: 2026-02-07
-**Author**: L.E.T / Leandro Emanuel Timberini
+**Commit**: `56b755a`
 **Status**: IMPLEMENTED_PENDING_RUN
 
 ## Objective

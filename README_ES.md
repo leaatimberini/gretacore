@@ -1,6 +1,6 @@
 # GRETA CORE
 
-**Estado**: Fase 3 - Serie de Auditorías B3.xx (Hasta B3.60)
+**Estado**: Fase 3 - Serie de Auditorías B3.xx (Hasta B3.66)
 
 ---
 
@@ -30,7 +30,9 @@ El proyecto existe para romper el lock-in actual de CUDA atacando el problema en
 | B3.52 | ✅ PASS | Fix de direccionamiento KV cache |
 | B3.55-B3.58 | ✅ PASS | Aislamiento de causa raíz (RoPE/Q-proj/RMSNorm) |
 | B3.59 | ✅ PASS | Auditoría Embedding + StageDebugInput |
-| B3.60 | ✅ PASS | Bisect Attention Block (pipeline Layer0 verificado) |
+| B3.64 | ✅ CLOSED | Diagnóstico RoPE Kernel (fix d_pos FP16→FP32) |
+| B3.65 | ✅ PASS_DETERMINISTIC | Auditoría Determinismo Decode |
+| B3.66 | 🔄 IMPLEMENTED_PENDING_RUN | Probe Drift Prefill vs Decode |
 
 **Documentación**:
 - [Índice de Progreso](docs/PROGRESS.md)

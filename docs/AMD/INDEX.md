@@ -1,9 +1,9 @@
 # GRETA CORE AMD Reports Index
 
 **Repository:** gretacore  
-**Branch:** `b3_59_embedding_debug_input_audit`  
-**Last Updated:** 2026-02-06  
-**Total Reports:** 40
+**Branch:** `main`  
+**Last Updated:** 2026-02-07  
+**Total Reports:** 48
 
 ---
 
@@ -19,13 +19,15 @@
 
 ## Reports by Date
 
-### 2026-02-05 (Latest)
+### 2026-02-07 (Latest)
 
 | ID | Report | Status | Artifacts |
 |----|--------|--------|-----------|
-| B3.59 | Embedding/DebugInput Audit | ✅ PASS | [`2026-02-05/b3_59/`](../artifacts_remote/2026-02-05/b3_59/) |
+| B3.66 | Prefill vs Decode Drift Probe | IMPLEMENTED_PENDING_RUN | [`2026-02-07/b3_66/`](../artifacts_remote/2026-02-07/b3_66/) |
+| B3.65 | Decode Determinism Audit | PASS_DETERMINISTIC | [`2026-02-07/B3_65_FINAL_REPORT.md`](../artifacts_remote/2026-02-07/B3_65_FINAL_REPORT.md) |
+| B3.64 | RoPE Kernel Launch Diagnostics | CLOSED | [`2026-02-07/b3_64/`](../artifacts_remote/2026-02-07/b3_64/) |
 
-### 2026-02-03 (Historical Analysis)
+### 2026-02-05
 
 | ID | Report | Status | Focus Area |
 |----|--------|--------|------------|
@@ -119,15 +121,16 @@
 ### Full Pipeline
 - B3.10, B3.37
 
+### Drift Probes
+- B3.66
+
 ---
 
 ## Artifacts Reference
 
 | Artifact Location | Associated Reports | Status |
 |-------------------|-------------------|--------|
-| `artifacts_remote/2026-02-03/` | B3.5 - B3.42 | ✅ Available |
-| `artifacts_remote/2026-02-04/` | B3.53 - B3.59 | ✅ Available |
-| `artifacts_remote/2026-02-05/` | B3.59 | ✅ Available |
+| `artifacts_remote/2026-02-07/` | B3.64, B3.65, B3.66 | ✅ Available |
 
 ---
 
