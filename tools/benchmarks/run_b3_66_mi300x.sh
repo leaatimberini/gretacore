@@ -1,13 +1,40 @@
 #!/bin/bash
 set -euo pipefail
 
-# Usage: ./run_b3_66_mi300x.sh <NODE_IP> [YYYY-MM-DD] [--mode as_designed|kv_aligned]
+# Usage: ./run_b3_66_mi300x.sh <NODE_IP> [YYYY-MM-DD] [--mode as_designed|kv_aligned | <MODE>]
 # Default date = today
-# Default mode = as_described
+# Default mode = as_designed
+# <MODE> can be positional (4th arg) or via --mode flag (flag has priority)
 
+# Extract NODE_IP and DATE from first two positional args
 NODE_IP="${1:-129.212.184.200}"
 DATE="${2:-$(date +%Y-%m-%d)}"
-MODE="${3:-as_designed}"
+
+# Shift args to process only mode-related arguments
+shift $(( $# > 2 ? 2 : 0 )) 2>/dev/null || true
+
+# Parse mode arguments (support for both --mode flag and positional mode)
+MODE_POSITIONAL=""
+MODE_FLAG=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --mode)
+            MODE_FLAG="$2"
+            shift 2
+            ;;
+        as_designed|kv_aligned)
+            MODE_POSITIONAL="$1"
+            shift
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
+
+# --mode flag has priority, then positional, then default
+MODE="${MODE_FLAG:-${MODE_POSITIONAL:-as_designed}}"
 
 # Validate mode
 if [[ "$MODE" != "as_designed" && "$MODE" != "kv_aligned" ]]; then
