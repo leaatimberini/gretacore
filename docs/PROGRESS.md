@@ -7,7 +7,7 @@
 **B3.65**: CLOSED - Decode determinism audit (PASS_DETERMINISTIC 10/10)
 **B3.66**: COMPLETED - Prefill vs decode drift probe (expected attention mismatch)
 **B3.66 v2**: COMPLETED - kv_aligned mode probe
-**B3.67**: COMPLETED (LOCAL) - Equivalence guardrail (prefill vs decode) (PASS_GUARDRAIL_LOCAL; pending MI300X)
+**B3.67**: COMPLETED (LOCAL) - Equivalence guardrail (prefill vs decode) (PASS_COMPLETENESS_GUARDRAIL 12/12; EXPECTED_DRIFT detected for kv_aligned=0)
 
 ---
 
@@ -18,7 +18,7 @@
 **B3.65**: CLOSED - Decode determinism audit (PASS_DETERMINISTIC 10/10)
 **B3.66**: COMPLETED - Prefill vs decode drift probe (expected attention mismatch)
 **B3.66 v2**: COMPLETED - kv_aligned mode probe
-**B3.67**: COMPLETED (LOCAL) - Equivalence guardrail (prefill vs decode) (PASS_GUARDRAIL_LOCAL; pending MI300X)
+**B3.67**: COMPLETED (LOCAL) - Equivalence guardrail (prefill vs decode) (PASS_COMPLETENESS_GUARDRAIL 12/12; EXPECTED_DRIFT detected for kv_aligned=0)
 
 ---
 

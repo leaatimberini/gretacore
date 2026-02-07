@@ -9,8 +9,11 @@ set -euo pipefail
 # Default kv_aligned = all (0,1)
 # Default seeds = "0,1,2"
 #
-# Este runner ejecuta el benchmark B3.67 para comparar logits entre prefill y decode
+# Este runner ejecuta el benchmark B3.67 para comparar hidden states entre prefill y decode
 # con diferentes configuraciones de kv_aligned.
+#
+# NOTA: Usa GRETA_TRACE_B3_66 para generar traces (hidden states del último layer)
+# Los traces se comparan entre prefill (phase=prefill_last) y decode (phase=decode0)
 # =============================================================================
 
 # -----------------------------------------------------------------------------
@@ -57,10 +60,11 @@ MODE_VALUES="prefill decode"
 # Arrays
 IFS=',' read -ra SEEDS_ARRAY <<< "$SEEDS"
 
+# Parse KV_ALIGNED into array (comma-separated)
 if [[ -z "$KV_ALIGNED" ]]; then
     KV_ALIGNED_VALUES=(0 1)
 else
-    KV_ALIGNED_VALUES=("$KV_ALIGNED")
+    IFS=',' read -ra KV_ALIGNED_VALUES <<< "$KV_ALIGNED"
 fi
 
 echo "=== B3.67 Equivalence Guardrail ==="
@@ -88,7 +92,7 @@ echo "[2/6] Build greta_infer..."
 ssh -o StrictHostKeyChecking=no "root@$NODE_IP" "cd $REMOTE_BASE/tools/inference/build && make -j\$(nproc)"
 
 echo "[3/6] Setup directories..."
-ssh -o StrictHostKeyChecking=no "root@$NODE_IP" "mkdir -p $REMOTE_BASE/artifacts_remote/$DATE/$RUN_DIR/{runs,metrics}"
+ssh -o StrictHostKeyChecking=no "root@$NODE_IP" "mkdir -p $REMOTE_BASE/artifacts_remote/$DATE/$RUN_DIR/{traces,logs}"
 
 # -----------------------------------------------------------------------------
 # Ejecutar benchmark para cada configuración
@@ -103,12 +107,19 @@ for KV_VAL in "${KV_ALIGNED_VALUES[@]}"; do
             echo "    Running mode=$MODE..."
 
             # Directorio local para esta configuración
-            LOCAL_RUN_DIR="artifacts_remote/$DATE/$RUN_DIR/runs/kv_aligned_$KV_VAL/seed_$SEED/$MODE"
-            mkdir -p "$LOCAL_RUN_DIR"
+            LOCAL_TRACES_DIR="artifacts_remote/$DATE/$RUN_DIR/traces/kv_aligned_$KV_VAL/seed_$SEED/$MODE"
+            mkdir -p "$LOCAL_TRACES_DIR"
 
             # Metadata
             TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
             GIT_COMMIT=$(git rev-parse HEAD)
+
+            # Map mode to B3.66 mode for tracing
+            if [[ "$MODE" == "prefill" ]]; then
+                B3_66_MODE="as_designed"  # Use as_designed for prefill traces
+            else
+                B3_66_MODE="as_designed"  # Use as_designed for decode traces
+            fi
 
             # Ejecutar en remoto con variables de entorno determinísticas
             ssh -o StrictHostKeyChecking=no "root@$NODE_IP" "
@@ -117,22 +128,31 @@ for KV_VAL in "${KV_ALIGNED_VALUES[@]}"; do
                 export AMD_SERIALIZE_KERNEL=3
                 export HSA_ENABLE_SDMA=0
                 export GRETA_SEED=$SEED
-                export GRETA_TRACE_B3_67=1
+                export GRETA_TRACE_B3_66=1
+                export GRETA_TRACE_LAYERS='0,1,2,4,8,16,24,31,32'
+                export GRETA_B3_66_MODE=$B3_66_MODE
                 export GRETA_KV_ALIGNED=$KV_VAL
 
-                # Ejecutar greta_infer y guardar logits
+                # Crear directorio para traces
+                mkdir -p \$HOME/artifacts_remote/$DATE/$RUN_DIR/traces/kv_aligned_$KV_VAL/seed_$SEED/$MODE
+
+                # Ejecutar greta_infer y guardar traces
                 ./tools/inference/build/greta_infer \
                     --model ./models/greta-v1.gguf \
                     --prompt tools/benchmarks/prompts/p0_short.txt \
-                    --max-tokens $GEN_LEN \
+                    --max-tokens 1 \
                     --seed $SEED \
                     --mode $MODE \
                     --dtype $DTYPE \
-                    --output-logits \
                     2>&1 | tee /tmp/greta_b3_67_${MODE}.log
 
+                # Mover traces al directorio correcto
+                if [ -d \$HOME/artifacts_remote/$DATE/$RUN_DIR/traces ]; then
+                    find \$HOME/artifacts_remote/$DATE/$RUN_DIR/traces -name '*.jsonl' -exec mv {} \$HOME/artifacts_remote/$DATE/$RUN_DIR/traces/kv_aligned_$KV_VAL/seed_$SEED/$MODE/ \;
+                fi
+
                 # Guardar metadata
-                cat > \$HOME/artifacts_remote/$DATE/$RUN_DIR/runs/kv_aligned_$KV_VAL/seed_$SEED/$MODE/metadata.json << EOF
+                cat > \$HOME/artifacts_remote/$DATE/$RUN_DIR/traces/kv_aligned_$KV_VAL/seed_$SEED/$MODE/config.json << EOF
 {
   \"dtype\": \"$DTYPE\",
   \"prompt_len\": $PROMPT_LEN,
@@ -147,19 +167,20 @@ EOF
             "
 
             # Copiar logs a local
-            scp -o StrictHostKeyChecking=no "root@$NODE_IP:/tmp/greta_b3_67_${MODE}.log" "$LOCAL_RUN_DIR/"
+            scp -o StrictHostKeyChecking=no "root@$NODE_IP:/tmp/greta_b3_67_${MODE}.log" "$LOCAL_TRACES_DIR/" 2>/dev/null || true
 
-            # Empaquetar logits si están en formato gzip
+            # Copiar traces comprimidos
             ssh -o StrictHostKeyChecking=no "root@$NODE_IP" "
-                cd \$HOME/artifacts_remote/$DATE/$RUN_DIR/runs/kv_aligned_$KV_VAL/seed_$SEED/$MODE
-                if [ -f logits.jsonl ]; then
-                    gzip -f logits.jsonl
-                fi
+                cd \$HOME/artifacts_remote/$DATE/$RUN_DIR/traces/kv_aligned_$KV_VAL/seed_$SEED/$MODE
+                for f in *.jsonl; do
+                    if [ -f \"\$f\" ]; then
+                        gzip -f \"\$f\"
+                    fi
+                done
             "
 
-            # Copiar archivos de logits comprimidos
-            scp -o StrictHostKeyChecking=no "root@$NODE_IP:$REMOTE_BASE/artifacts_remote/$DATE/$RUN_DIR/runs/kv_aligned_$KV_VAL/seed_$SEED/$MODE/logits.jsonl.gz" "$LOCAL_RUN_DIR/" 2>/dev/null || true
-            scp -o StrictHostKeyChecking=no "root@$NODE_IP:$REMOTE_BASE/artifacts_remote/$DATE/$RUN_DIR/runs/kv_aligned_$KV_VAL/seed_$SEED/$MODE/metadata.json" "$LOCAL_RUN_DIR/" 2>/dev/null || true
+            scp -o StrictHostKeyChecking=no "root@$NODE_IP:$REMOTE_BASE/artifacts_remote/$DATE/$RUN_DIR/traces/kv_aligned_$KV_VAL/seed_$SEED/$MODE/*.jsonl.gz" "$LOCAL_TRACES_DIR/" 2>/dev/null || true
+            scp -o StrictHostKeyChecking=no "root@$NODE_IP:$REMOTE_BASE/artifacts_remote/$DATE/$RUN_DIR/traces/kv_aligned_$KV_VAL/seed_$SEED/$MODE/config.json" "$LOCAL_TRACES_DIR/" 2>/dev/null || true
         done
     done
 done
@@ -170,7 +191,7 @@ done
 echo "[5/6] Package artifacts..."
 ssh -o StrictHostKeyChecking=no "root@$NODE_IP" "
     cd $REMOTE_BASE/artifacts_remote/$DATE/$RUN_DIR
-    tar -czvf gretacore_b3_67_artifacts.tgz runs/ metrics/
+    tar -czvf gretacore_b3_67_artifacts.tgz traces/ logs/
     ls -la
 "
 
@@ -179,7 +200,7 @@ ssh -o StrictHostKeyChecking=no "root@$NODE_IP" "
 # -----------------------------------------------------------------------------
 echo "[6/6] Run analyzer (local)..."
 python3 tools/benchmarks/analyze_b3_67_equivalence_guardrail.py \
-    --traces-dir "artifacts_remote/$DATE/$RUN_DIR/runs" \
+    --traces-dir "artifacts_remote/$DATE/$RUN_DIR/traces" \
     --output "artifacts_remote/$DATE/$RUN_DIR/B3_67_EQUIVALENCE_GUARDRAIL.md"
 
 echo ""
