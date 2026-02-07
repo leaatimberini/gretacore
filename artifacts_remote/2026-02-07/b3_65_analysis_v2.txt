@@ -1,0 +1,123 @@
+================================================================================
+                    B3.65 DECODE DETERMINISM AUDIT - ANALYSIS
+================================================================================
+
+Date: 2026-02-07
+Author: L.E.T / Leandro Emanuel Timberini
+Status: BLOCKED - Model Incompatibility (SECOND ATTEMPT)
+
+================================================================================
+                            SWEEP EXECUTION #2
+================================================================================
+
+Attempted: 2026-02-07 12:46 UTC
+Remote: MI300X (129.212.184.200)
+Commit: 9d03f74 (B3.65: Add decode determinism audit scripts and docs)
+Binary: greta_infer_fixed (newly compiled)
+
+Run Command:
+  ./tools/benchmarks/run_b3_65_determinism_mi300x.sh
+
+Result: FAILED at guard rail check
+
+================================================================================
+                            GUARD RAIL ERROR
+================================================================================
+
+[GUARD_RAIL] Validating model compatibility...
+[GUARD_RAIL_ERROR] hidden_dim mismatch!
+  Expected: 11008
+  Got:      14336
+
+[GUARD_RAIL_FATAL] Model incompatible with GRETA kernels!
+GRETA binary was compiled with hardcoded tensor dimensions
+for Llama-2-7B (dim=4096, heads=32, layers=32).
+
+================================================================================
+                            ROOT CAUSE ANALYSIS
+================================================================================
+
+Issue: Model-binary dimension mismatch prevents B3.65 execution.
+
+| Component        | Value           | Expected (Llama-2-7B) | Match |
+|-----------------|-----------------|-----------------------|-------|
+| GRETA binary    | hidden=11008    | hidden=11008          | YES   |
+| Model (gguf)    | hidden=14336    | hidden=11008          | NO    |
+| Model (gguf)    | dim=4096        | dim=4096              | YES   |
+| Model (gguf)    | layers=32       | layers=32             | YES   |
+| Model (gguf)    | heads=32        | heads=32              | YES   |
+
+Problem: The model greta-v1.gguf has hidden_dim=14336 (8B model architecture)
+         but GRETA was compiled for Llama-2-7B with hidden_dim=11008.
+
+Model Analysis:
+  - greta-v1.gguf: 8.0B model (14336 = 4 * 3584, typical 8B ratio)
+  - Llama-2-7B: 7B model (11008 = 4 * 2752, typical 7B ratio)
+
+================================================================================
+                            RESOLUTION PATH
+================================================================================
+
+OPTION A: Download and convert true Llama-2-7B
+  - Requires: HF Token for meta-llama/Llama-2-7b
+  - Command: ./tools/workflows/download_llama2_workflow.sh
+  - Script is INTERACTIVE - requires manual token entry
+
+OPTION B: Recompile GRETA with dynamic hidden_dim support
+  - Requires: Modify src/kernels/CMakeLists.txt
+  - Requires: Rebuild binary with dynamic tensor dimensions
+  - Time: ~30 minutes on MI300X
+
+OPTION C: Use a pre-compiled GRETA binary for 8B models
+  - Requires: Locate/build binary with hidden_dim=14336
+  - Risk: May require kernel modifications for 8B attention patterns
+
+================================================================================
+                            PREVIOUS ATTEMPT (2026-02-07 11:55)
+================================================================================
+
+Initial B3.65 run also failed with same guard rail error.
+Analysis documented in: artifacts_remote/2026-02-07/b3_65_analysis.txt
+
+================================================================================
+                            ARTIFACTS CREATED
+================================================================================
+
+Scripts:
+  - tools/benchmarks/run_b3_65_determinism_mi300x.sh
+  - tools/benchmarks/analyze_b3_65_determinism.py
+  - tools/workflows/download_llama2_workflow.sh
+
+Documentation:
+  - docs/AMD/2026_02_07_B3_65_decode_determinism_audit.md
+  - docs/es/B3_65_decode_determinism_audit_ES.md
+
+Binaries (new):
+  - tools/inference/greta_infer_fixed
+  - tools/inference/greta_infer_archive
+
+Model:
+  - models/greta-v1.gguf (4.9GB, 8B architecture)
+
+================================================================================
+                            NEXT STEPS
+================================================================================
+
+1. User must provide HF Token to run download_llama2_workflow.sh
+2. Or: Developer must recompile GRETA with dynamic shape support
+3. Once Llama-2-7B is properly downloaded/converted, re-run B3.65
+
+================================================================================
+                            VERDICT
+================================================================================
+
+VERDICT: BLOCKED
+
+Reason: Model-binary hidden_dim mismatch (14336 vs 11008)
+
+Resolution Required:
+  - Provide HF Token and execute download_llama2_workflow.sh
+  - OR recompile GRETA for 8B model support
+
+Signed: L.E.T / Leandro Emanuel Timberini
+Timestamp: 2026-02-07T12:47:00Z

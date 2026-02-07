@@ -1,0 +1,117 @@
+================================================================================
+                    B3.65 DECODE DETERMINISM AUDIT - ANALYSIS
+================================================================================
+
+Date: 2026-02-07
+Author: L.E.T / Leandro Emanuel Timberini
+Status: BLOCKED - Model Incompatibility
+
+================================================================================
+                              SWEEP EXECUTION
+================================================================================
+
+Attempted: 2026-02-07 11:55 UTC
+Remote: MI300X (129.212.184.200)
+Commit: 9d03f74 (B3.65: Add decode determinism audit scripts and docs)
+
+================================================================================
+                           FINDINGS
+================================================================================
+
+ERROR: [GUARD_RAIL_FATAL] Model incompatible with GRETA kernels!
+
+Root Cause Analysis:
+--------------------
+1. GRETA binary (greta_infer_fixed) was compiled with hardcoded dimensions
+   for Llama-2-7B:
+   - dim=4096
+   - heads=32
+   - layers=32
+   - hidden_dim=11008
+
+2. Available models on remote:
+
+   a) greta-v1.gguf (8.0B):
+      - Architecture: llama
+      - Layers: 32
+      - Embedding: 4096
+      - Hidden dim: 14336 (expected for 8B with 4x MLP)
+      - Heads: 32
+      - Heads KV: 8
+      - FFN: 14336
+
+   b) tinyllama.gguf (1.1B):
+      - Architecture: llama
+      - Layers: 22
+      - Embedding: 2048
+      - Hidden dim: 5632
+      - Heads: 32
+      - Heads KV: 4
+      - FFN: 5632
+
+Compatibility Matrix:
+--------------------
+| Model       | GRETA Expected | Match? |
+|-------------|----------------|--------|
+| greta-v1    | dim=4096       | YES    |
+|             | hidden=11008   | NO*    |
+|             | layers=32      | YES    |
+|             | heads=32       | YES    |
+|-------------|----------------|--------|
+| tinyllama   | dim=4096       | NO     |
+|             | hidden=11008   | NO     |
+|             | layers=32      | NO     |
+|             | heads=32       | YES    |
+
+* Hidden_dim mismatch: GRETA expects 11008, greta-v1 has 14336
+
+================================================================================
+                              VERDICT
+================================================================================
+
+VERDICT: BLOCKED
+
+Reason: Model-binary dimension mismatch prevents execution.
+
+Resolution Required:
+--------------------
+Option A: Recompile GRETA binary with correct hidden_dim=14336
+          (Requires: modify src/kernels and rebuild)
+
+Option B: Convert greta-v1.gguf to match GRETA dimensions
+          (Requires: model surgery - not recommended)
+
+Option C: Use model matching GRETA's expected dimensions
+          (Requires: locate/create Llama-2-7B Q4_K_M model)
+
+================================================================================
+                           ARTIFACTS
+================================================================================
+
+Scripts Created:
+- tools/benchmarks/run_b3_65_determinism_mi300x.sh
+- tools/benchmarks/analyze_b3_65_determinism.py
+
+Documentation:
+- docs/AMD/2026_02_07_B3_65_decode_determinism_audit.md
+- docs/es/B3_65_decode_determinism_audit_ES.md
+
+================================================================================
+                           RECOMMENDATION
+================================================================================
+
+B3.65 Determinism Sweep cannot proceed until GRETA binary is recompiled with
+correct dimensions (hidden_dim=14336) to match greta-v1.gguf model.
+
+This is a pre-requisite issue that must be resolved before decode consistency
+testing can be performed.
+
+================================================================================
+                           SIGNATURES
+================================================================================
+
+Executed by: Kilo Code (AI Assistant)
+Mode: Code
+Timestamp: 2026-02-07T11:54:45Z
+
+================================================================================

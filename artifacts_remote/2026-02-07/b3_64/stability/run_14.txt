@@ -1,0 +1,455 @@
+╔══════════════════════════════════════════════════════════╗
+║           GRETA CORE - LLM Inference Engine              ║
+║                    Phase 3 Preview                       ║
+╚══════════════════════════════════════════════════════════╝
+
+Configuration:
+  Model: models/greta-v1.gguf
+  Prompt: "What is 2+2?"
+  Max tokens: 5
+  Temperature: 1
+  Top-K: 50
+  Greedy: no
+
+[GRETA_RT] Initializing HIP Context...
+[GRETA_RT] Found 1 HIP device(s). Selecting device 0...
+[GRETA_RT] Context initialized successfully
+
+[GUARD_RAIL] WARNING: Guard rail DISABLED via GRETA_DISABLE_GUARD_RAIL
+[GUARD_RAIL] Continuing with potentially incompatible model...
+Model config: layers=32, dim=4096, heads=32, hidden=14336, vocab=128256, params=8.8353B
+[GRETA_MAIN] Initializing scheduler...
+[GRETA_SCHED] Creating stream...
+[GRETA_RT] Calling hipStreamCreate...
+[GRETA_RT] hipStreamCreate success
+[GRETA_SCHED] Stream created successfully
+[GRETA_MAIN] Initialized scheduler for 32 layers
+Allocating buffers...
+Buffers allocated
+
+Loading weights from: models/greta-v1.gguf
+[GRETA_SCHED] Starting weight load (INT8: OFF, INT4: OFF)
+[GRETA_SCHED] Loading layer 0/32...
+[GRETA_LOAD] Transposed blk.0.attn_k.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.0.attn_v.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.1.attn_k.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.1.attn_v.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.2.attn_k.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.2.attn_v.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.3.attn_k.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.3.attn_v.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.4.attn_k.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.4.attn_v.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.5.attn_k.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.5.attn_v.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.6.attn_k.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.6.attn_v.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.7.attn_k.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.7.attn_v.weight from [D, KV] to [KV, D]
+[GRETA_SCHED] Loading layer 8/32...
+[GRETA_LOAD] Transposed blk.8.attn_k.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.8.attn_v.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.9.attn_k.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.9.attn_v.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.10.attn_k.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.10.attn_v.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.11.attn_k.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.11.attn_v.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.12.attn_k.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.12.attn_v.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.13.attn_k.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.13.attn_v.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.14.attn_k.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.14.attn_v.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.15.attn_k.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.15.attn_v.weight from [D, KV] to [KV, D]
+[GRETA_SCHED] Loading layer 16/32...
+[GRETA_LOAD] Transposed blk.16.attn_k.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.16.attn_v.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.17.attn_k.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.17.attn_v.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.18.attn_k.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.18.attn_v.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.19.attn_k.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.19.attn_v.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.20.attn_k.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.20.attn_v.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.21.attn_k.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.21.attn_v.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.22.attn_k.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.22.attn_v.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.23.attn_k.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.23.attn_v.weight from [D, KV] to [KV, D]
+[GRETA_SCHED] Loading layer 24/32...
+[GRETA_LOAD] Transposed blk.24.attn_k.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.24.attn_v.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.25.attn_k.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.25.attn_v.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.26.attn_k.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.26.attn_v.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.27.attn_k.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.27.attn_v.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.28.attn_k.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.28.attn_v.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.29.attn_k.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.29.attn_v.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.30.attn_k.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.30.attn_v.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.31.attn_k.weight from [D, KV] to [KV, D]
+[GRETA_LOAD] Transposed blk.31.attn_v.weight from [D, KV] to [KV, D]
+Weights loaded (vocab size: 128256)
+[TOKENIZER] Loaded GGUF vocab: 128256
+[TOKENIZER] Mode: GGUF vocab
+Generator initialized
+
+═══════════════════════════════════════════════════════════
+Generating...
+
+[ROPE_DIAG] RoPE Q prefill x_ptr=0x7b70f8800000 seq_len=13 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K prefill x_ptr=0x7b7584400000 seq_len=13 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q prefill x_ptr=0x7b70f8800000 seq_len=13 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K prefill x_ptr=0x7b7584400000 seq_len=13 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q prefill x_ptr=0x7b70f8800000 seq_len=13 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K prefill x_ptr=0x7b7584400000 seq_len=13 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q prefill x_ptr=0x7b70f8800000 seq_len=13 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K prefill x_ptr=0x7b7584400000 seq_len=13 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q prefill x_ptr=0x7b70f8800000 seq_len=13 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K prefill x_ptr=0x7b7584400000 seq_len=13 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q prefill x_ptr=0x7b70f8800000 seq_len=13 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K prefill x_ptr=0x7b7584400000 seq_len=13 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q prefill x_ptr=0x7b70f8800000 seq_len=13 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K prefill x_ptr=0x7b7584400000 seq_len=13 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q prefill x_ptr=0x7b70f8800000 seq_len=13 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K prefill x_ptr=0x7b7584400000 seq_len=13 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q prefill x_ptr=0x7b70f8800000 seq_len=13 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K prefill x_ptr=0x7b7584400000 seq_len=13 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q prefill x_ptr=0x7b70f8800000 seq_len=13 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K prefill x_ptr=0x7b7584400000 seq_len=13 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q prefill x_ptr=0x7b70f8800000 seq_len=13 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K prefill x_ptr=0x7b7584400000 seq_len=13 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q prefill x_ptr=0x7b70f8800000 seq_len=13 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K prefill x_ptr=0x7b7584400000 seq_len=13 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q prefill x_ptr=0x7b70f8800000 seq_len=13 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K prefill x_ptr=0x7b7584400000 seq_len=13 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q prefill x_ptr=0x7b70f8800000 seq_len=13 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K prefill x_ptr=0x7b7584400000 seq_len=13 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q prefill x_ptr=0x7b70f8800000 seq_len=13 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K prefill x_ptr=0x7b7584400000 seq_len=13 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q prefill x_ptr=0x7b70f8800000 seq_len=13 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K prefill x_ptr=0x7b7584400000 seq_len=13 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q prefill x_ptr=0x7b70f8800000 seq_len=13 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K prefill x_ptr=0x7b7584400000 seq_len=13 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q prefill x_ptr=0x7b70f8800000 seq_len=13 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K prefill x_ptr=0x7b7584400000 seq_len=13 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q prefill x_ptr=0x7b70f8800000 seq_len=13 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K prefill x_ptr=0x7b7584400000 seq_len=13 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q prefill x_ptr=0x7b70f8800000 seq_len=13 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K prefill x_ptr=0x7b7584400000 seq_len=13 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q prefill x_ptr=0x7b70f8800000 seq_len=13 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K prefill x_ptr=0x7b7584400000 seq_len=13 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q prefill x_ptr=0x7b70f8800000 seq_len=13 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K prefill x_ptr=0x7b7584400000 seq_len=13 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q prefill x_ptr=0x7b70f8800000 seq_len=13 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K prefill x_ptr=0x7b7584400000 seq_len=13 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q prefill x_ptr=0x7b70f8800000 seq_len=13 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K prefill x_ptr=0x7b7584400000 seq_len=13 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q prefill x_ptr=0x7b70f8800000 seq_len=13 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K prefill x_ptr=0x7b7584400000 seq_len=13 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q prefill x_ptr=0x7b70f8800000 seq_len=13 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K prefill x_ptr=0x7b7584400000 seq_len=13 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q prefill x_ptr=0x7b70f8800000 seq_len=13 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K prefill x_ptr=0x7b7584400000 seq_len=13 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q prefill x_ptr=0x7b70f8800000 seq_len=13 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K prefill x_ptr=0x7b7584400000 seq_len=13 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q prefill x_ptr=0x7b70f8800000 seq_len=13 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K prefill x_ptr=0x7b7584400000 seq_len=13 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q prefill x_ptr=0x7b70f8800000 seq_len=13 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K prefill x_ptr=0x7b7584400000 seq_len=13 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q prefill x_ptr=0x7b70f8800000 seq_len=13 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K prefill x_ptr=0x7b7584400000 seq_len=13 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q prefill x_ptr=0x7b70f8800000 seq_len=13 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K prefill x_ptr=0x7b7584400000 seq_len=13 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[D2H_SAFE_WRAPPER] engaged for tensor=buffer_offset
+[D2H_CHECK] tensor=buffer_offset step=ffffffff layer=ffffffff src_ptr=7b7086bdf000 dst_ptr=e2d7900 offset=5df000 size=7d400 alloc=3ea00000
+[SAMPLE DEBUG] Logits stats: min=-13.8929 max=12.332 avg=-0.472823 NaNs=0
+  Top tokens: 96965(12.332) 52263(12.0733) 16460(11.3608) 198(11.1295) 65615(10.7715) 
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[D2H_SAFE_WRAPPER] engaged for tensor=buffer_offset
+[D2H_CHECK] tensor=buffer_offset step=ffffffff layer=ffffffff src_ptr=7b7086c5c400 dst_ptr=e2d7900 offset=65c400 size=7d400 alloc=3ea00000
+[SAMPLE DEBUG] Logits stats: min=-13.8929 max=12.3323 avg=-0.47283 NaNs=0
+  Top tokens: 96965(12.3323) 52263(12.0734) 16460(11.3609) 198(11.1293) 65615(10.7716) 
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[D2H_SAFE_WRAPPER] engaged for tensor=buffer_offset
+[D2H_CHECK] tensor=buffer_offset step=ffffffff layer=ffffffff src_ptr=7b7086cd9800 dst_ptr=e2d7900 offset=6d9800 size=7d400 alloc=3ea00000
+[SAMPLE DEBUG] Logits stats: min=-13.8917 max=12.3317 avg=-0.472835 NaNs=0
+  Top tokens: 96965(12.3317) 52263(12.0733) 16460(11.3605) 198(11.1301) 65615(10.7715) 
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[D2H_SAFE_WRAPPER] engaged for tensor=buffer_offset
+[D2H_CHECK] tensor=buffer_offset step=ffffffff layer=ffffffff src_ptr=7b7086d56c00 dst_ptr=e2d7900 offset=756c00 size=7d400 alloc=3ea00000
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE Q decode x_ptr=0x7b70f8800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x7b7584400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x7b75a0406000 valid=true
+[D2H_SAFE_WRAPPER] engaged for tensor=buffer_offset
+[D2H_CHECK] tensor=buffer_offset step=ffffffff layer=ffffffff src_ptr=7b7086dd4000 dst_ptr=e2d7900 offset=7d4000 size=7d400 alloc=3ea00000
+Prompt: What is 2+2?
+Generated: �
+
+═══════════════════════════════════════════════════════════
+Statistics:
+  Prompt tokens: 13
+  Generated tokens: 5
+  Total time: 792.055 ms
+  Time to first token: 211.434 ms
+  Tokens/second: 6.31269
+
+STATUS=OK

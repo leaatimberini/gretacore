@@ -6,14 +6,126 @@
 #include <thread>
 #include <chrono>
 #include <cstdlib>
+#include <cstdio>
+#include <ctime>
 
 /// Namespace para wrappers seguros de operaciones D2H (Device-to-Host)
 namespace greta_d2h_safe {
+
+// ============================================================================
+// B3.63: INSTRUMENTACIÓN DE AUDITORÍA D2H
+// ============================================================================
 
 /// Debug mode flag - sincronizaciones agresivas cuando GRETA_D2H_DEBUG=1
 inline bool is_debug_mode() {
     const char* v = std::getenv("GRETA_D2H_DEBUG");
     return v && (v[0] == '1' || v[0] == 'y' || v[0] == 'Y');
+}
+
+/// Audit mode flag - logs detallados cuando GCORE_D2H_AUDIT=1
+inline bool is_audit_mode() {
+    const char* v = std::getenv("GCORE_D2H_AUDIT");
+    return v && (v[0] == '1' || v[0] == 'y' || v[0] == 'Y');
+}
+
+/// Contador global de operaciones D2H para auditoría
+inline size_t get_d2h_op_counter() {
+    static size_t counter = 0;
+    return counter++;
+}
+
+/// Obtener timestamp en microsegundos para auditoría
+inline const char* get_audit_timestamp() {
+    static char ts[64];
+    struct timespec spec;
+    clock_gettime(CLOCK_REALTIME, &spec);
+    snprintf(ts, sizeof(ts), "%ld.%06ld", spec.tv_sec, spec.tv_nsec / 1000);
+    return ts;
+}
+
+/// Registrar inicio de operación D2H en modo auditoría
+inline void audit_d2h_start(
+    hipStream_t stream,
+    const void* dev_ptr,
+    void* host_ptr,
+    size_t bytes,
+    const char* tensor_name,
+    int step,
+    int layer) {
+    
+    if (!is_audit_mode()) return;
+    
+    static FILE* audit_log = nullptr;
+    if (!audit_log) {
+        const char* log_path = std::getenv("GCORE_D2H_AUDIT_LOG");
+        if (log_path) {
+            audit_log = fopen(log_path, "a");
+        } else {
+            audit_log = stderr;
+        }
+    }
+    
+    size_t op_id = get_d2h_op_counter();
+    fprintf(audit_log, 
+        "[D2H_AUDIT_START] op_id=%zu ts=%s stream=%p dev_ptr=0x%lx "
+        "host_ptr=0x%lx bytes=%zu tensor=%s step=%d layer=%d\n",
+        op_id, get_audit_timestamp(), 
+        (void*)stream, (unsigned long)dev_ptr, 
+        (unsigned long)host_ptr, bytes,
+        tensor_name, step, layer);
+    fflush(audit_log);
+}
+
+/// Registrar fin de operación D2H en modo auditoría
+inline void audit_d2h_end(
+    hipStream_t stream,
+    hipError_t result,
+    const char* tensor_name,
+    size_t op_id) {
+    
+    if (!is_audit_mode()) return;
+    
+    static FILE* audit_log = nullptr;
+    if (!audit_log) {
+        const char* log_path = std::getenv("GCORE_D2H_AUDIT_LOG");
+        if (log_path) {
+            audit_log = fopen(log_path, "a");
+        } else {
+            audit_log = stderr;
+        }
+    }
+    
+    fprintf(audit_log,
+        "[D2H_AUDIT_END] op_id=%zu ts=%s stream=%p result=%s tensor=%s\n",
+        op_id, get_audit_timestamp(),
+        (void*)stream, hipGetErrorString(result),
+        tensor_name);
+    fflush(audit_log);
+}
+
+/// Wrapper para hipEventRecord + hipEventSynchronize en modo audit
+inline bool audit_event_record_sync(
+    hipEvent_t event,
+    hipStream_t stream,
+    const char* context) {
+    
+    if (!is_audit_mode()) return true;
+    
+    hipError_t err = hipEventRecord(event, stream);
+    if (err != hipSuccess) {
+        std::cerr << "[D2H_AUDIT_ERROR] hipEventRecord failed in " << context
+                  << ": " << hipGetErrorString(err) << "\n";
+        return false;
+    }
+    
+    err = hipEventSynchronize(event);
+    if (err != hipSuccess) {
+        std::cerr << "[D2H_AUDIT_ERROR] hipEventSynchronize failed in " << context
+                  << ": " << hipGetErrorString(err) << "\n";
+        return false;
+    }
+    
+    return true;
 }
 
 /// Metadata para trazas de D2H
