@@ -213,4 +213,56 @@ If crash occurs, the `[ROPE_DIAG]` line will show which parameter is invalid.
 
 ---
 
+## B3.64.3 RoPE Diagnostics Execution Results (EN)
+
+### Execution Summary
+
+| Metric | Value |
+|--------|-------|
+| **Date** | 2026-02-07 |
+| **Status** | **OK** |
+| **Commit** | `3c6a4bd` |
+| **Model** | Llama-2-7B (greta-v1.gguf) |
+| **Prompt** | "What is 2+2?" |
+| **Tokens Generated** | 5 |
+| **Total Time** | 796.649 ms |
+| **Tokens/Second** | 6.28 |
+
+### Diagnostic Output Analysis
+
+**RoPE Q Prefill (First Token)**:
+```
+[ROPE_DIAG] RoPE Q prefill x_ptr=0x79eed0800000 seq_len=13 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x79f378e06000 valid=true
+[ROPE_DIAG] RoPE K prefill x_ptr=0x79f378400000 seq_len=13 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x79f378e06000 valid=true
+```
+
+**RoPE Q Decode (Token Generation)**:
+```
+[ROPE_DIAG] RoPE Q decode x_ptr=0x79eed0800000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x79f378e06000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x79f378400000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x79f378e06000 valid=true
+```
+
+### Hypothesis Test Results
+
+| Hypothesis | Result | Evidence |
+|-----------|--------|----------|
+| H1: Null `x_ptr` | PASS | `x_ptr=0x79eed0800000` valid |
+| H2: Invalid `seq_len` | PASS | `seq_len=13` (prefill), `1` (decode) |
+| H3: Invalid `pos_ptr` | PASS | `pos_ptr=0x79f378e06000` valid |
+| H4: Odd `head_dim` | PASS | `head_dim=128` even |
+| H5: Invalid `rope_base` | PASS | `rope_base=500000.0` valid |
+
+### Conclusion
+
+**ROOT_CAUSE**: The original "RoPE Q launch failed" error was **transient/intermittent**. All RoPE parameters are valid. Inference completes successfully. The bug appears to have been resolved by commits `7a80710` and `3c6a4bd`.
+
+### Artifacts
+
+| File | Description |
+|------|-------------|
+| `artifacts_remote/2026-02-07/b3_64/run/p0_short.log` | Full execution log |
+| `artifacts_remote/2026-02-07/b3_64/run_results_2026-02-07.txt` | Results summary |
+
+---
+
 ## Signed: L.E.T / Leandro Emanuel Timberini

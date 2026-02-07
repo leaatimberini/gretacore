@@ -23,7 +23,11 @@ echo "Output: $OUT_DIR"
 # 1. LOCK EXCLUSIVO
 # =============================================
 echo "--- Acquiring exclusive lock ---"
-if ! flock -n "$LOCK_FILE" 200>/dev/null; then
+
+# Crear el lock file si no existe
+touch "$LOCK_FILE"
+
+if ! flock -n "$LOCK_FILE" -c 'echo "Lock acquired"'; then
     HOLDING_PID=$(fuser "$LOCK_FILE" 2>/dev/null || echo "unknown")
     echo "ERROR: Lock file busy: $LOCK_FILE"
     echo "Holding PID: $HOLDING_PID"

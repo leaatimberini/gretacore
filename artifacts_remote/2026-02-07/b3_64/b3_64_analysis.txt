@@ -1,0 +1,95 @@
+# B3.64 Analysis Report - D2H Illegal Memory Access Forensics
+
+**Date**: 2026-02-07
+**Crash**: `hipMemcpy D2H failed: an illegal memory access was encountered`
+
+---
+
+## Resumen del Crash
+
+El benchmark B3.64 falló con un error crítico de memoria durante la transferencia Device-to-Host (D2H). El error indica que el puntero de dispositivo pasado a `hipMemcpy` no es válido, lo que causa un acceso ilegal a memoria.
+
+---
+
+## Veredicto de Hipótesis
+
+| Hipótesis | Estado | Descripción |
+|-----------|--------|-------------|
+| H1: Use-after-free | **INCONCLUSIVO** | Wrappers no invocados - no hay evidencia de free previo |
+| H2: Offset incorrecto | **INCONCLUSIVO** | Wrappers no invocados - no hay datos de tracing |
+| H3: Race condition | **FAIL** | Crash persiste con sincronización - no es race condition |
+
+---
+
+## Etapa Exacta del Fault
+
+**Etapa**: D2H Transfer (Device-to-Host Memory Copy)
+**Llamada fallida**: `hipMemcpy(dst_host, src_device, size, hipMemcpyDeviceToHost)`
+**Error específico**: `hipMemcpy D2H failed: an illegal memory access was encountered`
+
+---
+
+## Causa Raíz Más Probable
+
+**BUFFER_NO_VALIDO**: El puntero de dispositivo (`src_device`) pasado a `hipMemcpy` no pointa a memoria válida en el device.
+
+Posibles causas:
+1. **Puntero corrupto**: El puntero device fue sobrescrito o no fue inicializado correctamente
+2. **Buffer liberado**: El buffer fue liberado (hipFree) antes de la transferencia D2H
+3. **Dirección inválida**: La dirección del device no fue obtenida correctamente de hipMalloc
+
+**Evidencia**:
+- Error es consistente: "illegal memory access"
+- Ocurre durante operación D2H
+- Wrappers de debug no fueron invocados (sugiere que el crash ocurre antes de la instrumentación)
+
+---
+
+## Próximos Pasos Requeridos
+
+1. **Instrumentación adicional**: Agregar logging del puntero device antes de hipMemcpy
+2. **Validación de punteros**: Verificar que el puntero device sea válido antes de D2H
+3. **Revisar ciclo de vida de buffers**: Asegurar que los buffers no sean liberados prematuramente
+4. **HIP memory inspector**: Usar herramientas AMD para inspeccionar estado de memoria
+
+---
+
+=== EVOLUCIÓN DEL DIAGNÓSTICO 2026-02-07 ===
+
+NUEVO HALLAZGO:
+- Error original: "hipMemcpy D2H failed: an illegal memory access was encountered"
+- Error actual:   "RoPE Q launch failed: an illegal memory access was encountered"
+- El wrapper D2H [D2H_SAFE_WRAPPER] NO se ejecutó (no hay logs de D2H)
+
+ANÁLISIS:
+- El crash ocurre ANTES de llegar al código D2H
+- El kernel RoPE falla durante el lanzamiento (hipModuleLaunchKernel o similar)
+- Esto indica un problema en:
+  1) Puntero/payload incorrecto pasado al kernel RoPE
+  2) Buffer no inicializado/corrupto usado por RoPE
+  3) Sincronización de stream incorrecta antes del kernel
+
+RECOMENDACIÓN:
+- B3.64 debe marcarse como "ROOT_CAUSE: RoPE KERNEL FAULT (upstream)"
+- Nuevo ticket B3.65: Diagnosticar kernel RoPE
+- El D2H instrumentado está listo pero no es el camino del código que falla
+
+UBICACIÓN ESPERADA DEL BUG:
+- src/kernels/rope.cpp o similar
+- hipModuleLaunchKernel para RoPE Q
+- Buffers de query/position pasados al kernel
+
+---
+
+## Commits Relacionados
+
+- `a5f004c` - feat(b3_64): add locked runner with HIP debug env
+- `1173ae5` - feat(b3_64): add D2H safe wrappers with debug instrumentation
+
+---
+
+## Información de Configuración
+
+- **Model**: greta-v1.gguf
+- **Status**: RUN_FAILED - Forensics phase (evolved to RoPE upstream fault)
+- **Artifact Location**: `artifacts_remote/2026-02-07/b3_64/`
