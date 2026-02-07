@@ -81,6 +81,20 @@ ssh -o StrictHostKeyChecking=no "root@$NODE_IP" "
     ls -la
 "
 
+echo "[7/7] Run analyzer (local)..."
+python3 tools/benchmarks/analyze_b3_66_prefill_decode_drift.py \
+    --traces-dir artifacts_remote/$DATE/$RUN_DIR/traces \
+    --mode $MODE \
+    --output artifacts_remote/$DATE/$RUN_DIR/B3_66_V2_ANALYSIS.md
+
+echo ""
+echo "=== B3.66 v2 Execution Summary ==="
+echo "Mode: $MODE"
+echo "Date: $DATE"
+echo "Prompts run: p0_short, p6_len_16, p6_len_32"
+echo "Output dir: artifacts_remote/$DATE/$RUN_DIR/"
+echo "Report: artifacts_remote/$DATE/$RUN_DIR/B3_66_V2_ANALYSIS.md"
+echo ""
 echo "Done. Copy artifacts with:"
 echo "  scp root@$NODE_IP:$REMOTE_BASE/artifacts_remote/$DATE/$RUN_DIR/gretacore_b3_66_v2_${MODE}_artifacts.tgz ."
 
