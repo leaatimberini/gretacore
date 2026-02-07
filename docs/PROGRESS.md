@@ -1,17 +1,17 @@
 # GRETA Core Progress Index
 
 ## Sync Status (2026-02-07)
-- **Local HEAD**: `e3143aa` ✅ B3.64 RoPE diagnostics committed
-- **GitHub HEAD**: `ff39be3` ⚠️ (pending push)
-- **Remote MI300X**: `28a5e49` ✅ (sync-ed, stateless verified)
+- **Local HEAD**: `d28ea0e` ✅ B3.64 closed (hardening verified)
+- **GitHub HEAD**: `d28ea0e` ✅ (pushed)
+- **Remote MI300X**: `d28ea0e` ✅ (sync-ed, stateless verified)
 - **AMD Reports**: 47 documents in `docs/AMD/`
-- **Artifacts**: B3.64 forensics in `artifacts_remote/2026-02-07/b3_64/`
+- **Artifacts**: B3.64 stability sweep in `artifacts_remote/2026-02-07/b3_64/stability/`
 
 ## Phase Index
 
 | Phase | Date | HEAD Hash | Objective | Root Cause | Result | Artifacts | AMD Report |
 |-------|------|-----------|-----------|------------|--------|-----------|------------|
-| **B3.64** | 2026-02-07 | `3c6a4bd` | RoPE Kernel Launch Diagnostics | `BUFFER_TYPE_MISMATCH (d_pos FP16→FP32)` | **FIXED** ✅ | [b3_64](artifacts_remote/2026-02-07/b3_64/) | [b3_64_analysis](artifacts_remote/2026-02-07/b3_64/b3_64_analysis.txt) |
+| **B3.64** | 2026-02-07 | `d28ea0e` | RoPE Kernel Launch Diagnostics | `UNSAFE_ASYNC_D2H_AND_KERNEL_LAUNCH_ORDERING` | **CLOSED** ✅ | [stability](artifacts_remote/2026-02-07/b3_64/stability/) | [b3_64_audit](docs/AMD/2026_02_06_B3_64_numerical_drift_audit.md) |
 | B3.63 | 2026-02-06 | `e09989c` | HIP D2H Root Cause Fix | `ASYNC_D2H_RACE` | **INCOMPLETE** ⚠️ | N/A | [d2h_safe.hpp](src/inference/include/gcore/inference/d2h_safe.hpp) |
 | B3.62 | 2026-02-06 | `303b634` | HIP D2H Transfer Audit | `BUG_NOT_REPRODUCED` | **INSTRUMENTATION_ADDED** | [B3.62](artifacts_remote/2026-02-06/b3_62/) | [AMD_B3_62](docs/AMD/2026_02_06_B3_62_hip_d2h_transfer_audit.md) |
 | B3.61 | 2026-02-06 | `e09989c` | Residual Stream Bisect | N/A | **OK** | Full traces: 3 prompts, layers 0,1,2,4,8 | [b3_61](artifacts_remote/2026-02-06/b3_61/) | [AMD_B3_61](docs/AMD/2026_02_06_B3_61_residual_stream_bisect.md) |
