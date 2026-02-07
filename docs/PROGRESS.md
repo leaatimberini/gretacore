@@ -4,7 +4,7 @@
 
 **B3.63**: CLOSED - D2H Async Race Audit (NOT_REPRODUCED)
 **B3.64**: CLOSED - D2H/RoPE crash fix (d_pos buffer type mismatch)
-**B3.65**: CLOSED - Decode determinism audit (PASS 10/10)
+**B3.65**: CLOSED - Decode determinism audit (PASS_DETERMINISTIC 10/10)
 **B3.66**: COMPLETED - Prefill vs decode drift probe (expected attention mismatch)
 **B3.66 v2**: COMPLETED - kv_aligned mode probe
 
@@ -14,7 +14,7 @@
 
 **B3.63**: CLOSED - D2H Async Race Audit (NOT_REPRODUCED)
 **B3.64**: CLOSED - D2H/RoPE crash fix (d_pos buffer type mismatch)
-**B3.65**: CLOSED - Decode determinism audit (PASS 10/10)
+**B3.65**: CLOSED - Decode determinism audit (PASS_DETERMINISTIC 10/10)
 **B3.66**: COMPLETED - Prefill vs decode drift probe (expected attention mismatch)
 **B3.66 v2**: COMPLETED - kv_aligned mode probe
 
@@ -22,7 +22,7 @@
 
 ## Sync Status (2026-02-07)
 
-**Repo HEAD (main)**: `77fd6bd` (b3.66 runner dual parser mode)
+**Repo branch**: `main` (tracked via origin/main)
 
 **Implementation Commits (por ticket)**:
 - B3.63 D2H audit: `de3b888`
@@ -44,7 +44,7 @@
 | B3.64 | 2026-02-07 | D2H/RoPE crash hardening | CLOSED | PASS 20/20 | BUFFER_TYPE_MISMATCH (d_pos FP16→FP32) | artifacts_remote/2026-02-07/b3_64/stability/ | docs/AMD/2026_02_06_B3_64_numerical_drift_audit.md |
 | B3.65 | 2026-02-07 | Decode Determinism Audit | CLOSED | PASS_DETERMINISTIC | N/A (no-code-change audit) | artifacts_remote/2026-02-07/B3_65_FINAL_REPORT.md | docs/AMD/2026_02_07_B3_65_decode_determinism_audit.md |
 | B3.66 | 2026-02-07 | Prefill vs Decode Drift Probe | COMPLETED | FAIL (expected) | ATTENTION_COMPUTATION_MISMATCH | artifacts_remote/2026-02-07/b3_66/ | docs/AMD/2026_02_07_B3_66_prefill_decode_drift_probe.md |
-| B3.66 v2 | 2026-02-07 | kv_aligned Mode | COMPLETED | EXPECTED | STRUCTURAL_DRIFT (as_designed) | artifacts_remote/2026-02-07/b3_66_v2/ | docs/AMD/2026_02_07_B3_66_v2_kv_aligned_probe.md |
+| B3.66 v2 | 2026-02-07 | kv_aligned Mode | COMPLETED | EXPECTED (kv_aligned evidence added) | STRUCTURAL_DRIFT (EXPECTED; prefill vs decode semantics) | artifacts_remote/2026-02-07/b3_66_v2/ | docs/AMD/2026_02_07_B3_66_v2_kv_aligned_probe.md |
 
 ---
 
