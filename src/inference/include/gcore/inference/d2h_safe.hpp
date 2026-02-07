@@ -197,3 +197,29 @@ inline bool greta_hip_memcpy_d2h_safe_sync(
 }
 
 } // namespace greta_d2h_safe
+
+// Aliases para compatibilidad
+namespace greta_d2h_safe {
+    inline bool safe_hipMemcpy(
+        void* dst,
+        const void* src,
+        size_t bytes,
+        hipMemcpyKind kind,
+        const char* debug_name = "unknown") {
+        D2HMetadata meta;
+        meta.tensor_name = debug_name;
+        return greta_hip_memcpy_d2h_safe_sync(dst, src, bytes, kind, meta);
+    }
+
+    inline bool safe_hipMemcpyAsync(
+        void* dst,
+        const void* src,
+        size_t bytes,
+        hipMemcpyKind kind,
+        hipStream_t stream,
+        const char* debug_name = "unknown") {
+        D2HMetadata meta;
+        meta.tensor_name = debug_name;
+        return greta_hip_memcpy_d2h_safe(dst, src, bytes, kind, stream, meta);
+    }
+} // namespace greta_d2h_safe
