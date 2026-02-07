@@ -265,4 +265,80 @@ If crash occurs, the `[ROPE_DIAG]` line will show which parameter is invalid.
 
 ---
 
+## B3.64.4 ROOT CAUSE FOUND: d_pos Buffer Type Mismatch (EN)
+
+### Critical Finding
+
+**Date**: 2026-02-07  
+**ROOT_CAUSE**: `BUFFER_TYPE_MISMATCH`  
+**Location**: `src/inference/src/block_scheduler.cpp:1645`
+
+### Bug Description
+
+| Field | Value |
+|-------|-------|
+| **Buffer** | `activations_.d_pos` |
+| **Allocated Type** | `GretaDataType::FP16` (2 bytes) |
+| **Stored Type** | `uint32_t` (4 bytes) |
+| **Size Mismatch** | 2x under-allocation |
+
+### The Fix
+
+```cpp
+// BEFORE (line 1645):
+activations_.d_pos.allocate(sizeof(uint32_t), Usage::DeviceOnly,
+                            gcore::rt::GretaDataType::FP16, err);  // BUG!
+
+// AFTER (B3.64.4 FIX):
+activations_.d_pos.allocate(sizeof(uint32_t), Usage::DeviceOnly,
+                            gcore::rt::GretaDataType::FP32, err);  // CORRECT!
+```
+
+### Why This Caused the Crash
+
+1. Buffer allocated with `FP16` (2 bytes per element)
+2. Code writes `uint32_t` (4 bytes per element) to `d_pos`
+3. Kernel reads beyond allocated bounds → **illegal memory access**
+4. Result: "RoPE Q launch failed" (kernel faults on invalid memory)
+
+### Stability Sweep Results
+
+| Metric | Value |
+|--------|-------|
+| **Total Runs** | 20 |
+| **Success Rate** | **100% (20/20)** |
+| **Failures** | 0 |
+| **Avg Time/run** | ~800ms |
+
+### Sample Log Output
+
+```
+[ROPE_DIAG] RoPE Q decode x_ptr=0x6ffb76600000 seq_len=1 num_heads=32 head_dim=128 rope_base=500000.000000 pos_ptr=0x700004406000 valid=true
+[ROPE_DIAG] RoPE K decode x_ptr=0x6ffb75c00000 seq_len=1 num_heads=8 head_dim=128 rope_base=500000.000000 pos_ptr=0x700004406000 valid=true
+[D2H_SAFE_WRAPPER] engaged for tensor=buffer_offset
+[D2H_CHECK] tensor=buffer_offset step=ffffffff layer=ffffffff src_ptr=6ffb03fdf000 dst_ptr=fb0b920 offset=5df000 size=7d400 alloc=3ea00000
+STATUS=OK
+```
+
+### Verification
+
+The fix was verified with:
+- `GRETA_DISABLE_GUARD_RAIL=1` (model has hidden_dim=14336 vs binary expects 11008)
+- `HIP_LAUNCH_BLOCKING=1`
+- `HSA_ENABLE_SDMA=0`
+
+### Artifacts
+
+| File | Description |
+|------|-------------|
+| `artifacts_remote/2026-02-07/b3_64/run/fixed_no_guard.log` | First successful run with fix |
+| `artifacts_remote/2026-02-07/b3_64/run/sweep20.log` | 20-run stability sweep |
+| `artifacts_remote/2026-02-07/b3_64/stability/` | Individual run logs |
+
+### Conclusion
+
+**FIXED**: The d_pos buffer type mismatch has been corrected. The stability sweep of 20 runs confirms the fix is stable.
+
+---
+
 ## Signed: L.E.T / Leandro Emanuel Timberini

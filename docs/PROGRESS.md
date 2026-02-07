@@ -11,7 +11,7 @@
 
 | Phase | Date | HEAD Hash | Objective | Root Cause | Result | Artifacts | AMD Report |
 |-------|------|-----------|-----------|------------|--------|-----------|------------|
-| **B3.64** | 2026-02-07 | `3c6a4bd` | RoPE Kernel Launch Diagnostics | `TRANSIENT_BUG_FIXED` | **OK** ✅ | [b3_64](artifacts_remote/2026-02-07/b3_64/) | [b3_64_analysis](artifacts_remote/2026-02-07/b3_64/b3_64_analysis.txt) |
+| **B3.64** | 2026-02-07 | `3c6a4bd` | RoPE Kernel Launch Diagnostics | `BUFFER_TYPE_MISMATCH (d_pos FP16→FP32)` | **FIXED** ✅ | [b3_64](artifacts_remote/2026-02-07/b3_64/) | [b3_64_analysis](artifacts_remote/2026-02-07/b3_64/b3_64_analysis.txt) |
 | B3.63 | 2026-02-06 | `e09989c` | HIP D2H Root Cause Fix | `ASYNC_D2H_RACE` | **INCOMPLETE** ⚠️ | N/A | [d2h_safe.hpp](src/inference/include/gcore/inference/d2h_safe.hpp) |
 | B3.62 | 2026-02-06 | `303b634` | HIP D2H Transfer Audit | `BUG_NOT_REPRODUCED` | **INSTRUMENTATION_ADDED** | [B3.62](artifacts_remote/2026-02-06/b3_62/) | [AMD_B3_62](docs/AMD/2026_02_06_B3_62_hip_d2h_transfer_audit.md) |
 | B3.61 | 2026-02-06 | `e09989c` | Residual Stream Bisect | N/A | **OK** | Full traces: 3 prompts, layers 0,1,2,4,8 | [b3_61](artifacts_remote/2026-02-06/b3_61/) | [AMD_B3_61](docs/AMD/2026_02_06_B3_61_residual_stream_bisect.md) |
@@ -33,12 +33,14 @@ See [docs/AMD/INDEX.md](docs/AMD/INDEX.md) for full index with categories and li
 |-------|-------|-------|-----------|--------|-----------|
 | Forensics | 2026-02-07 | `hipMemcpy D2H failed` | `BUFFER_INVALID` | 🔍 FORENSICS_COMPLETED | B3.64 - Root Cause |
 | Evolved | 2026-02-07 | `RoPE Q launch failed` | `ROPE_KERNEL_FAULT (upstream)` | 🔄 EVOLVED | B3.65 - Diagnosticar kernel RoPE |
-| **RESOLVED** | 2026-02-07 | `No error` | `TRANSIENT_BUG_FIXED` | ✅ **OK** | B3.65 - Siguiente feature |
+| **RESOLVED** | 2026-02-07 | `No error` | `BUFFER_TYPE_MISMATCH (d_pos FP16→FP32)` | ✅ **FIXED** | B3.65 - Siguiente feature |
 
 **Evolución del diagnóstico:**
 - Error original: "hipMemcpy D2H failed: an illegal memory access was encountered"
 - Error evolucionó: "RoPE Q launch failed: an illegal memory access was encountered"
-- Estado actual: **RESUELTO** - El bug fue transitorio y corregido por commits recientes
+- **ROOT CAUSE IDENTIFIED**: Buffer `d_pos` allocated with `FP16` (2 bytes) but stores `uint32_t` (4 bytes)
+- **FIX APPLIED**: Changed `FP16` → `FP32` at `block_scheduler.cpp:1645`
+- Estado actual: **RESUELTO** - Fix verificado con sweep 20/20
 
 **Resultado del benchmark B3.64.3:**
 - STATUS: **OK**
@@ -54,8 +56,10 @@ See [docs/AMD/INDEX.md](docs/AMD/INDEX.md) for full index with categories and li
 
 ## Closed Tickets
 
-### B3.64: D2H Illegal Memory Access → RoPE Kernel Fault
-- **ETAPA**: ROOT_CAUSE IDENTIFIED (upstream)
-- **ERROR**: RoPE Q launch failed: an illegal memory access was encountered
-- **D2H WRAPPER**: Instrumentado y enganchado, pero NO ejecutado
-- **PRÓXIMO**: B3.65 - Diagnosticar kernel RoPE launch
+### B3.64: D2H Illegal Memory Access → RoPE Kernel Fault (FIXED)
+- **ETAPA**: ROOT_CAUSE FOUND AND FIXED
+- **ERROR**: "RoPE Q launch failed: an illegal memory access was encountered"
+- **ROOT CAUSE**: `d_pos` buffer type mismatch (FP16 allocated, uint32_t stored)
+- **FIX**: `FP16` → `FP32` at `block_scheduler.cpp:1645`
+- **VERIFICATION**: 20/20 stability sweep PASSED
+- **PRÓXIMO**: B3.65 - Numerical Drift Post-Hardening

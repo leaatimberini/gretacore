@@ -1641,8 +1641,9 @@ bool BlockScheduler::allocate_activations(size_t batch_size, size_t max_seq_len,
   activations_.tokens.allocate(tokens_size, Usage::DeviceOnly,
                                gcore::rt::GretaDataType::FP16, err);
 
+  // B3.64.4 FIX: d_pos stores uint32_t, must allocate with FP32 (not FP16)
   activations_.d_pos.allocate(sizeof(uint32_t), Usage::DeviceOnly,
-                              gcore::rt::GretaDataType::FP16, err);
+                              gcore::rt::GretaDataType::FP32, err);
 
   size_t logits_size =
       batch_size * max_seq_len * config_.vocab_size * sizeof(float);
