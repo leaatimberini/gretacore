@@ -116,10 +116,42 @@ EXPECTED_DRIFT_ONLY si:
   - NO hay runs con kv_aligned=1 (solo drift esperado)
 ```
 
+## Completeness Guardrail
+
+### Configuración con config.json
+
+El benchmark soporta un archivo `config.json` en el directorio raíz de artifacts para declarar la matriz esperada:
+
+```json
+{
+  "kv_aligned": [0, 1],
+  "seeds": [0, 1, 2],
+  "dtype": "bf16",
+  "prompt_len": 512,
+  "gen_len": 128
+}
+```
+
+### Veredictos de Completitud
+
+| Condición | Veredicto Global | Descripción |
+|-----------|------------------|-------------|
+| Matriz completa + PASS | `PASS_GUARDRAIL` | Todos los pares ejecutados y pasaron umbrales |
+| Matriz completa + FAIL | `FAIL_GUARDRAIL` | Al menos un par con kv_aligned=1 falló |
+| Matriz incompleta | `INCOMPLETE` | Faltan pares declarados en config.json |
+| Sin config.json | `PASS_GUARDRAIL_LOCAL` | Modo best-effort (smoke test local) |
+
+### Nota sobre PASS_GUARDRAIL_LOCAL
+
+- **Qué significa**: Smoke test local exitoso, pero sin verificación de completitud de matriz
+- **Requiere**: Ejecución completa en MI300X con config.json para veredicto final
+- **No es un PASS definitivo** hasta que se ejecute la matriz completa en hardware de producción
+
 ## Artifact Structure
 
 ```
 artifacts_remote/YYYY-MM-DD/b3_67/
+├── config.json                    # Opcional: matriz esperada
 ├── runs/
 │   ├── kv_aligned_0/
 │   │   ├── seed_0/

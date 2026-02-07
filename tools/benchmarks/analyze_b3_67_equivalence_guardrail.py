@@ -10,6 +10,10 @@ Veredictos:
 - kv_aligned=0: EXPECTED_DRIFT (drift permitido, solo registrar métricas)
 
 Strict pairing: tokens deben coincidir por token_id y token_idx.
+
+Completeness Guardrail:
+- Con config.json: verifica que la matriz completa este ejecutada
+- Sin config.json: modo best effort con PASS_GUARDRAIL_LOCAL
 """
 
 import argparse
@@ -303,79 +307,61 @@ def analyze_runs(runs_dir: str) -> tuple[dict, list]:
             except ValueError:
                 continue
 
-            prefill_dir = os.path.join(seed_dir, "prefill")
-            decode_dir = os.path.join(seed_dir, "decode")
+            prefill_dir = str(seed_dir / "prefill")
+            decode_dir = str(seed_dir / "decode")
 
-            if os.path.exists(prefill_dir) and os.path.exists(decode_dir):
-                result = analyze_pair(prefill_dir, decode_dir, kv_aligned, seed)
-                results[kv_aligned][seed] = result
+            # Verificar que existen ambos directorios
+            if not os.path.exists(prefill_dir) or not os.path.exists(decode_dir):
+                errors.append(f"WARNING: Missing prefill/decode dirs for seed={seed}, kv_aligned={kv_aligned}")
+                continue
 
-                if result.get("verdict") == "ERROR":
-                    errors.append(result.get("error", "Unknown error"))
+            result = analyze_pair(prefill_dir, decode_dir, kv_aligned, seed)
+            results[kv_aligned][seed] = result
+
+            if "error" in result:
+                errors.append(result["error"])
 
     return results, errors
 
 
+# -----------------------------------------------------------------------------
+# Aggregación
+# -----------------------------------------------------------------------------
+
 def aggregate_results(results: dict) -> dict:
-    """Agrega resultados por kv_aligned y computa veredicto global."""
+    """Agrega resultados de todos los runs."""
     summary = {
         "total_runs": 0,
         "pass_equiv": 0,
         "fail_equiv": 0,
         "expected_drift": 0,
         "errors": 0,
-        "first_fail": None,
-        "metrics_summary": {}
+        "first_fail": None
     }
 
     for kv_aligned, seeds in results.items():
-        kv_key = f"kv_aligned_{kv_aligned}"
-        summary[kv_key] = {
-            "total": 0,
-            "pass_equiv": 0,
-            "fail_equiv": 0,
-            "expected_drift": 0,
-            "errors": 0,
-            "metrics_aggregated": {
-                "max_abs_diff_max": 0.0,
-                "p99_abs_diff_max": 0.0,
-                "top1_agreement_min": 1.0
-            }
-        }
-
         for seed, result in seeds.items():
             summary["total_runs"] += 1
-            summary[kv_key]["total"] += 1
-
             verdict = result.get("verdict", "UNKNOWN")
 
             if verdict == "PASS_EQUIV":
                 summary["pass_equiv"] += 1
-                summary[kv_key]["pass_equiv"] += 1
             elif verdict == "FAIL_EQUIV":
                 summary["fail_equiv"] += 1
-                summary[kv_key]["fail_equiv"] += 1
-                # Track first fail global
-                if summary["first_fail"] is None:
-                    summary["first_fail"] = {
-                        "kv_aligned": kv_aligned,
-                        "seed": seed,
-                        "details": result.get("first_fail")
-                    }
             elif verdict == "EXPECTED_DRIFT":
                 summary["expected_drift"] += 1
-                summary[kv_key]["expected_drift"] += 1
-            else:
+            elif verdict == "ERROR":
                 summary["errors"] += 1
-                summary[kv_key]["errors"] += 1
 
-            # Aggregate metrics
-            metrics = result.get("metrics", {})
-            if metrics:
-                m = summary[kv_key]["metrics_aggregated"]
-                m["max_abs_diff_max"] = max(m["max_abs_diff_max"], metrics.get("max_abs_diff", 0))
-                m["p99_abs_diff_max"] = max(m["p99_abs_diff_max"], metrics.get("p99_abs_diff", 0))
-                m["top1_agreement_min"] = min(m["top1_agreement_min"], metrics.get("top1_agreement", 1.0))
+            # Track first failure for FAIL_EQUIV
+            if verdict == "FAIL_EQUIV" and summary["first_fail"] is None:
+                summary["first_fail"] = {
+                    "kv_aligned": kv_aligned,
+                    "seed": seed,
+                    "max_abs_diff": result.get("metrics", {}).get("max_abs_diff", 0),
+                    "p99_abs_diff": result.get("metrics", {}).get("p99_abs_diff", 0),
+                    "top1_agreement": result.get("metrics", {}).get("top1_agreement", 0)
+                }
 
     # Veredicto global
     if summary["total_runs"] > 0:
@@ -418,7 +404,7 @@ def write_summary_json(summary: dict, output_path: str):
         json.dump(summary, f, indent=2)
 
 
-def write_markdown_report(results: dict, summary: dict, errors: list, output_path: str, date: str):
+def write_markdown_report(results: dict, summary: dict, errors: list, output_path: str, date: str, missing_list: list = None):
     """Escribe el reporte markdown."""
     with open(output_path, 'w') as f:
         f.write("# B3.67 Equivalence Guardrail Analysis\n\n")
@@ -432,13 +418,33 @@ def write_markdown_report(results: dict, summary: dict, errors: list, output_pat
                 f.write(f"- {err}\n")
             f.write("\n")
 
-        # Threshold config
+        # Completeness section
+        f.write("## Completeness Status\n\n")
+        config_present = summary.get('config_present', False)
+        f.write(f"- **Config Present**: {config_present}\n")
+        
+        if config_present:
+            f.write(f"- **Expected Pairs**: {summary.get('expected_pairs', 'N/A')}\n")
+            f.write(f"- **Found Pairs**: {summary.get('found_pairs', 'N/A')}\n")
+            f.write(f"- **Missing Pairs**: {summary.get('missing_pairs_count', 'N/A')}\n")
+            f.write(f"- **Completeness Verdict**: `{summary.get('completeness_verdict', 'N/A')}`\n\n")
+            
+            if missing_list:
+                f.write("### Missing Pairs\n\n")
+                for missing in missing_list:
+                    f.write(f"- {missing}\n")
+                f.write("\n")
+        else:
+            f.write("- **Note**: No config.json found. Running in best-effort mode.\n")
+            f.write("- **Global Verdict**: `PASS_GUARDRAIL_LOCAL` (completeness unknown)\n\n")
+
+        # Threshold Configuration
         f.write("## Threshold Configuration\n\n")
         f.write("| Metric | Threshold |\n")
         f.write("|--------|-----------|\n")
-        f.write(f"| p99_abs_diff_max | {THRESHOLDS['p99_abs_diff_max']} |\n")
-        f.write(f"| max_abs_diff_max | {THRESHOLDS['max_abs_diff_max']} |\n")
-        f.write(f"| top1_agreement_min | {THRESHOLDS['top1_agreement_min']} |\n\n")
+        for metric, value in THRESHOLDS.items():
+            f.write(f"| {metric} | {value} |\n")
+        f.write("\n")
 
         # Summary
         f.write("## Summary\n\n")
@@ -447,30 +453,17 @@ def write_markdown_report(results: dict, summary: dict, errors: list, output_pat
         f.write(f"- **FAIL_EQUIV**: {summary['fail_equiv']}\n")
         f.write(f"- **EXPECTED_DRIFT**: {summary['expected_drift']}\n")
         f.write(f"- **Errors**: {summary['errors']}\n")
-        f.write(f"- **Global Verdict**: `{summary.get('global_verdict', 'N/A')}`\n\n")
+        f.write(f"- **Global Verdict**: `{summary['global_verdict']}`\n\n")
 
-        # First fail
-        if summary.get("first_fail"):
-            ff = summary["first_fail"]
-            f.write("## First Failure\n\n")
-            f.write(f"- **KV Aligned**: {ff['kv_aligned']}\n")
-            f.write(f"- **Seed**: {ff['seed']}\n")
-            if ff.get("details"):
-                d = ff["details"]
-                f.write(f"- **Token Idx**: {d.get('token_idx', 'N/A')}\n")
-                f.write(f"- **Token Id**: {d.get('token_id', 'N/A')}\n")
-                f.write(f"- **Max Abs Diff**: {d.get('max_abs_diff', 'N/A')}\n")
-                f.write(f"- **P99 Abs Diff**: {d.get('p99_abs_diff', 'N/A')}\n")
-            f.write("\n")
-
-        # Detailed results table
+        # Detailed Results
         f.write("## Detailed Results\n\n")
         f.write("| KV Aligned | Seed | Pairs | Missing | Max Abs Diff | P99 Abs Diff | Top1 Agreement | Verdict |\n")
         f.write("|------------|------|-------|---------|--------------|--------------|----------------|---------|\n")
 
         for kv_aligned in sorted(results.keys()):
-            for seed in sorted(results[kv_aligned].keys()):
-                r = results[kv_aligned][seed]
+            seeds = results[kv_aligned]
+            for seed in sorted(seeds.keys()):
+                r = seeds[seed]
                 metrics = r.get("metrics", {})
                 f.write(f"| {kv_aligned} | {seed} | {r.get('pair_count', 'N/A')} | {r.get('missing_pairs', 0)} | "
                         f"{metrics.get('max_abs_diff', 'N/A'):.6f} | "
@@ -501,6 +494,86 @@ def write_markdown_report(results: dict, summary: dict, errors: list, output_pat
 
 
 # -----------------------------------------------------------------------------
+# Completeness Guardrail
+# -----------------------------------------------------------------------------
+
+def load_config(config_path: str) -> dict | None:
+    """Carga config.json si existe."""
+    if not os.path.exists(config_path):
+        return None
+    try:
+        with open(config_path, 'r') as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+def get_expected_pairs(config: dict) -> set:
+    """
+    Construye el set esperado de pares (kv_aligned, seed, dtype, prompt_len, gen_len).
+    """
+    expected = set()
+    seeds = config.get('seeds', [0, 1, 2])
+    kv_aligned_values = config.get('kv_aligned', [0, 1])
+    dtype = config.get('dtype', 'bf16')
+    prompt_len = config.get('prompt_len', 512)
+    gen_len = config.get('gen_len', 128)
+    
+    for kv in kv_aligned_values:
+        for seed in seeds:
+            expected.add((kv, seed, dtype, prompt_len, gen_len))
+    return expected
+
+
+def get_found_pairs(results: dict) -> set:
+    """
+    Construye el set de pares encontrados en results.
+    """
+    found = set()
+    for kv_aligned, seeds in results.items():
+        for seed, result in seeds.items():
+            if 'error' not in result:
+                meta = result.get('metadata', {})
+                dtype = meta.get('dtype', 'bf16')
+                prompt_len = meta.get('prompt_len', 512)
+                gen_len = meta.get('gen_len', 128)
+                found.add((kv_aligned, seed, dtype, prompt_len, gen_len))
+    return found
+
+
+def check_completeness(config: dict | None, results: dict) -> tuple[dict, list]:
+    """
+    Verifica completitud de la matriz.
+    
+    Returns: (summary_extra, missing_pairs)
+    """
+    if config is None:
+        # Modo best effort: no hay config, no podemos verificar completitud
+        return {
+            'config_present': False,
+            'expected_pairs': 0,
+            'found_pairs': sum(len(seeds) for seeds in results.values()),
+            'missing_pairs_count': -1,
+            'missing_pairs': [],
+            'completeness_verdict': 'UNKNOWN_COMPLETENESS'
+        }, []
+    
+    expected = get_expected_pairs(config)
+    found = get_found_pairs(results)
+    
+    missing = expected - found
+    
+    return {
+        'config_present': True,
+        'expected_pairs': len(expected),
+        'found_pairs': len(found),
+        'missing_pairs_count': len(missing),
+        'missing_pairs': sorted([str(p) for p in missing]),
+        'completeness_verdict': 'COMPLETE' if not missing else 'INCOMPLETE'
+    }, sorted([str(p) for p in missing])
+
+
+# -----------------------------------------------------------------------------
 # Main
 # -----------------------------------------------------------------------------
 
@@ -509,51 +582,83 @@ def main():
     parser.add_argument("--traces-dir", required=True, help="Directory with runs/")
     parser.add_argument("--output", required=True, help="Output markdown file path")
     parser.add_argument("--date", default=None, help="Date string (default: today)")
-
+    
     args = parser.parse_args()
-
+    
     date = args.date or __import__('datetime').datetime.now().strftime("%Y-%m-%d")
-
+    
+    # Cargar config.json
+    parent_dir = os.path.dirname(args.traces_dir.rstrip('/'))
+    config_path = os.path.join(parent_dir, 'config.json')
+    config = load_config(config_path)
+    
     # Analizar runs
     print(f"Analyzing runs in: {args.traces_dir}")
     results, errors = analyze_runs(args.traces_dir)
-
+    
+    # Verificar completitud
+    completeness_info, missing_list = check_completeness(config, results)
+    
     if not results and not errors:
         print("ERROR: No runs found")
         sys.exit(1)
-
+    
     # Imprimir errores
     if errors:
         for err in errors:
             print(err)
-
+    
     # Escribir metrics.json por par
     output_dir = os.path.dirname(args.output)
     write_metrics_json(results, output_dir)
-
+    
     # Agregar resultados
     summary = aggregate_results(results)
-
+    
+    # Agregar info de completitud
+    summary.update(completeness_info)
+    
+    # Determinar veredicto global considerando completitud
+    if summary['missing_pairs_count'] == -1:
+        # Sin config: veredicto LOCAL
+        summary['global_verdict'] = 'PASS_GUARDRAIL_LOCAL'
+    elif summary['missing_pairs_count'] > 0:
+        # Matriz incompleta
+        summary['global_verdict'] = 'INCOMPLETE'
+    else:
+        # Matriz completa: evaluar normalmente
+        if summary.get('fail_equiv', 0) > 0:
+            summary['global_verdict'] = 'FAIL_GUARDRAIL'
+        elif summary.get('pass_equiv', 0) > 0 and summary.get('expected_drift', 0) >= 0:
+            summary['global_verdict'] = 'PASS_GUARDRAIL'
+        elif summary.get('expected_drift', 0) > 0 and summary.get('pass_equiv', 0) == 0:
+            summary['global_verdict'] = 'EXPECTED_DRIFT_ONLY'
+        else:
+            summary['global_verdict'] = 'INCONCLUSIVE'
+    
     # Escribir summary.json
     base_name = os.path.splitext(os.path.basename(args.output))[0]
     summary_json_path = os.path.join(output_dir, f"{base_name}_summary.json")
     write_summary_json(summary, summary_json_path)
-
+    
     # Escribir reporte markdown
-    write_markdown_report(results, summary, errors, args.output, date)
-
+    write_markdown_report(results, summary, errors, args.output, date, missing_list)
+    
     print(f"Analysis complete.")
     print(f"Metrics JSON: {output_dir}/metrics/")
     print(f"Summary JSON: {summary_json_path}")
     print(f"Report: {args.output}")
     print(f"Global Verdict: {summary['global_verdict']}")
-
-    if summary.get("first_fail"):
+    print(f"Config Present: {summary['config_present']}")
+    if summary.get('missing_pairs_count', 0) > 0:
+        print(f"Missing Pairs: {summary['missing_pairs_count']}")
+    
+    if summary.get('first_fail'):
         print(f"First Failure: KV={summary['first_fail']['kv_aligned']}, Seed={summary['first_fail']['seed']}")
-
+    
     # Exit code based on verdict
-    if summary['global_verdict'] == 'FAIL_GUARDRAIL':
-        print("ERROR: Benchmark FAILED - check report for details")
+    if summary['global_verdict'] in ['FAIL_GUARDRAIL', 'INCOMPLETE']:
+        print(f"ERROR: Benchmark {summary['global_verdict']} - check report for details")
         sys.exit(1)
     sys.exit(0)
 
