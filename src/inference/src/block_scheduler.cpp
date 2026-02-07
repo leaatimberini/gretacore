@@ -95,6 +95,76 @@ inline bool safe_hipMemcpyAsync(
 
 } // namespace greta_d2h_safe
 
+/**
+ * B3.64: RoPE Kernel Launch Diagnostics
+ * Instrumentación para diagnosticar fallos en launch_rope
+ */
+namespace greta_rope_diag {
+
+// Valida parametros antes de lanzar RoPE kernel
+inline bool validate_rope_params(
+    const void* x_ptr,
+    uint32_t seq_len,
+    uint32_t num_heads,
+    uint32_t head_dim,
+    float rope_base,
+    const void* pos_ptr,
+    const char* kernel_name) {
+
+  bool is_valid = true;
+
+  // Validar puntero del tensor
+  if (!x_ptr) {
+    std::cerr << "[ROPE_DIAG] ERROR " << kernel_name
+              << ": x_ptr is NULL\n";
+    is_valid = false;
+  }
+
+  // Validar dimensiones
+  if (seq_len == 0) {
+    std::cerr << "[ROPE_DIAG] ERROR " << kernel_name
+              << ": seq_len is 0\n";
+    is_valid = false;
+  }
+  if (num_heads == 0) {
+    std::cerr << "[ROPE_DIAG] ERROR " << kernel_name
+              << ": num_heads is 0\n";
+    is_valid = false;
+  }
+  if (head_dim == 0) {
+    std::cerr << "[ROPE_DIAG] ERROR " << kernel_name
+              << ": head_dim is 0\n";
+    is_valid = false;
+  }
+  if (head_dim % 2 != 0) {
+    std::cerr << "[ROPE_DIAG] ERROR " << kernel_name
+              << ": head_dim is odd (" << head_dim << ") - RoPE requires even\n";
+    is_valid = false;
+  }
+
+  // Validar rope_base
+  if (rope_base <= 0.0f) {
+    std::cerr << "[ROPE_DIAG] ERROR " << kernel_name
+              << ": rope_base is invalid (" << rope_base << ")\n";
+    is_valid = false;
+  }
+
+  // Log estructurado de parametros
+  std::cerr << "[ROPE_DIAG] " << kernel_name
+            << " x_ptr=" << std::hex << x_ptr
+            << " seq_len=" << std::dec << seq_len
+            << " num_heads=" << num_heads
+            << " head_dim=" << head_dim
+            << " rope_base=" << std::fixed << rope_base
+            << " pos_ptr=" << std::hex << pos_ptr
+            << " valid=" << (is_valid ? "true" : "false")
+            << "\n";
+
+  return is_valid;
+}
+
+} // namespace greta_rope_diag
+
 #include <unordered_map>
 #include <vector>
 
@@ -2010,21 +2080,31 @@ bool BlockScheduler::execute_layer(size_t layer_idx, size_t seq_start,
                          hip_stream, q, k, v, cache_k, cache_v, d_pos,
                          config_.max_seq_len, Hkv, Dh, config_.rope_base),
                      "Fused RoPE+KV Update");
+    // B3.64 DIAG: Validar parametros RoPE antes de lanzar
+    greta_rope_diag::validate_rope_params(q, S, Hq, Dh, config_.rope_base, d_pos, "RoPE Q (Fused KV)");
     CHECK_HIP_KERNEL(
         launch_rope(hip_stream, q, S, Hq, Dh, config_.rope_base, d_pos),
         "RoPE Q (Fused KV)");
   } else {
     if (S == 1) {
+      // B3.64 DIAG: Validar parametros RoPE Q decode
+      greta_rope_diag::validate_rope_params(q, S, Hq, Dh, config_.rope_base, d_pos, "RoPE Q decode");
       CHECK_HIP_KERNEL(
           launch_rope(hip_stream, q, S, Hq, Dh, config_.rope_base, d_pos),
           "RoPE Q");
+      // B3.64 DIAG: Validar parametros RoPE K decode
+      greta_rope_diag::validate_rope_params(k, S, Hkv, Dh, config_.rope_base, d_pos, "RoPE K decode");
       CHECK_HIP_KERNEL(
           launch_rope(hip_stream, k, S, Hkv, Dh, config_.rope_base, d_pos),
           "RoPE K");
     } else {
+      // B3.64 DIAG: Validar parametros RoPE Q prefill
+      greta_rope_diag::validate_rope_params(q, S, Hq, Dh, config_.rope_base, pos, "RoPE Q prefill");
       CHECK_HIP_KERNEL(
           launch_rope(hip_stream, q, S, Hq, Dh, config_.rope_base, pos),
           "RoPE Q");
+      // B3.64 DIAG: Validar parametros RoPE K prefill
+      greta_rope_diag::validate_rope_params(k, S, Hkv, Dh, config_.rope_base, pos, "RoPE K prefill");
       CHECK_HIP_KERNEL(
           launch_rope(hip_stream, k, S, Hkv, Dh, config_.rope_base, pos),
           "RoPE K");
