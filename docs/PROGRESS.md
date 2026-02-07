@@ -22,12 +22,13 @@
 
 ## Sync Status (2026-02-07)
 
-**Repo HEAD (main)**: `a70ac354055501c7c08d7914b00371bb566bbfe8`
+**Repo HEAD (main)**: `77fd6bd` (b3.66 runner dual parser mode)
 
 **Implementation Commits (por ticket)**:
-- B3.66 implementation: `56b755a`
-- Docs index normalization: `1f662f1`
-- Docs reconcile HEAD: `23c36b1`
+- B3.63 D2H audit: `de3b888`
+- B3.66 base mode: `56b755a`
+- B3.66 v2 mode: `77fd6bd`
+- Docs index: `1f662f1`
 
 **Nota / Note**:
 - ES: Repo HEAD es el snapshot actual del repositorio; los commits de implementación por ticket se mantienen separados para trazabilidad.
