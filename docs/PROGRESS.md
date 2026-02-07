@@ -1,116 +1,43 @@
-# GRETA Core Progress Index
+# GRETA CORE - Progress Report
 
-## Sync Status (2026-02-07)
-- **Repo HEAD (main)**: `56b755a`
-- **B3.66 implementation commit**: `56b755a`
+## Resumen Ejecutivo
+
+**B3.64**: CLOSED - D2H/RoPE crash fix (d_pos buffer type mismatch)
+**B3.65**: CLOSED - Decode determinism audit (PASS 10/10)
+**B3.66**: COMPLETED - Prefill vs decode drift probe (expected attention mismatch)
+
+---
+
+## Executive Summary
+
+**B3.64**: CLOSED - D2H/RoPE crash fix (d_pos buffer type mismatch)
+**B3.65**: CLOSED - Decode determinism audit (PASS 10/10)
+**B3.66**: COMPLETED - Prefill vs decode drift probe (expected attention mismatch)
+
+---
+
+## Sync Status
+
+Repo HEAD (main): `fde84713c02082cef95edc8bdbd10a608bbf808b`
+B3.66 implementation commit: `56b755a`
+Docs updates: `1342409`, `fde8471`
+
+---
 
 ## Phase Index
 
-| Phase | Date | HEAD Hash | Objective | Root Cause | Result | Artifacts | AMD Report |
-|-------|------|-----------|-----------|------------|--------|-----------|------------|
-| **B3.66** | 2026-02-07 | `56b755a` | Prefill vs Decode Drift Probe | `ATTENTION_COMPUTATION_MISMATCH` | **FAIL (EXPECTED)** | [b3_66_final](artifacts_remote/2026-02-07/B3_66_FINAL_REPORT.md) | [2026_02_07_B3_66](docs/AMD/2026_02_07_B3_66_prefill_decode_drift_probe.md) |
-| **B3.65** | 2026-02-07 | `d28ea0e` | Decode Determinism Audit | N/A | **PASS_DETERMINISTIC** | N/A | [B3.65_Analysis](artifacts_remote/2026-02-07/B3_65_FINAL_REPORT.md) |
-| **B3.64** | 2026-02-07 | `d28ea0e` | RoPE Kernel Launch Diagnostics | `BUFFER_TYPE_MISMATCH (d_pos FP16→FP32)` | **CLOSED** | [stability](artifacts_remote/2026-02-07/b3_64/stability/) | [b3_64_audit](docs/AMD/2026_02_06_B3_64_numerical_drift_audit.md) |
-| B3.63 | 2026-02-06 | `e09989c` | HIP D2H Root Cause Fix | `ASYNC_D2H_RACE` | **INCOMPLETE** ⚠️ | N/A | [d2h_safe.hpp](src/inference/include/gcore/inference/d2h_safe.hpp) |
-| B3.62 | 2026-02-06 | `303b634` | HIP D2H Transfer Audit | `BUG_NOT_REPRODUCED` | **INSTRUMENTATION_ADDED** | [B3.62](artifacts_remote/2026-02-06/b3_62/) | [AMD_B3_62](docs/AMD/2026_02_06_B3_62_hip_d2h_transfer_audit.md) |
-| B3.61 | 2026-02-06 | `e09989c` | Residual Stream Bisect | N/A | **OK** | Full traces: 3 prompts, layers 0,1,2,4,8 | [b3_61](artifacts_remote/2026-02-06/b3_61/) | [AMD_B3_61](docs/AMD/2026_02_06_B3_61_residual_stream_bisect.md) |
-| B3.59 | 2026-02-05 | `d558073` | Embedding/DebugInput audit | CLEAN | Confirmed OK | [B3.59](artifacts_remote/2026-02-05/b3_59/) | [AMD_B3_59](docs/AMD/2026_02_05_B3_59_embedding_debug_input_audit.md) |
-| B3.58 | 2026-02-05 | `d558073` | RMSNorm wiring audit | `UPSTREAM_X_MISMATCH` | X0/Ceros en decode0 | [B3.58](artifacts_remote/2026-02-04/b3_58/) | N/A |
-| B3.57.1 | 2026-02-04 | `d558073` | RMSNorm divergence | `NORMOUT_SELECTION` | Confirmed | N/A | N/A |
+| Ticket | Date | Objective | Status | Result | Root Cause | Artifacts | AMD Report |
+|--------|------|-----------|--------|--------|------------|-----------|------------|
+| B3.64 | 2026-02-07 | D2H/RoPE crash hardening | CLOSED | PASS 20/20 | BUFFER_TYPE_MISMATCH (d_pos FP16→FP32) | artifacts_remote/2026-02-07/b3_64/stability/ | docs/AMD/2026_02_06_B3_64_numerical_drift_audit.md |
+| B3.65 | 2026-02-07 | Decode Determinism Audit | CLOSED | PASS_DETERMINISTIC | N/A (no-code-change audit) | artifacts_remote/2026-02-07/B3_65_FINAL_REPORT.md | docs/AMD/2026_02_07_B3_65_decode_determinism_audit.md |
+| B3.66 | 2026-02-07 | Prefill vs Decode Drift Probe | COMPLETED | FAIL (expected) | ATTENTION_COMPUTATION_MISMATCH | artifacts_remote/2026-02-07/b3_66/ | docs/AMD/2026_02_07_B3_66_prefill_decode_drift_probe.md |
 
 ---
 
-## Complete AMD Report Index (49 documents)
+## Complete AMD Report Index (50 documents)
 
-See [docs/AMD/INDEX.md](docs/AMD/INDEX.md) for full index with categories and links.
-
----
-
-## Technical Details (B3.64 - D2H → RoPE Kernel - CLOSED)
-
-| Etapa | Fecha | Error | ROOT_CAUSE | Estado | Siguiente |
-|-------|-------|-------|-----------|--------|-----------|
-| Forensics | 2026-02-07 | `hipMemcpy D2H failed` | `BUFFER_INVALID` | 🔍 FORENSICS_COMPLETED | B3.64 - Root Cause |
-| Evolved | 2026-02-07 | `RoPE Q launch failed` | `ROPE_KERNEL_FAULT (upstream)` | 🔄 EVOLVED | B3.65 - Diagnosticar kernel RoPE |
-| **RESOLVED** | 2026-02-07 | `No error` | `BUFFER_TYPE_MISMATCH (d_pos FP16→FP32)` | ✅ **FIXED** | B3.65 - Siguiente feature |
-
-**Evolución del diagnóstico:**
-- Error original: "hipMemcpy D2H failed: an illegal memory access was encountered"
-- Error evolucionó: "RoPE Q launch failed: an illegal memory access was encountered"
-- **ROOT CAUSE IDENTIFIED**: Buffer `d_pos` allocated with `FP16` (2 bytes) but stores `uint32_t` (4 bytes)
-- **FIX APPLIED**: Changed `FP16` → `FP32` at `block_scheduler.cpp:1645`
-- Estado actual: **RESUELTO** - Fix verificado con sweep 20/20
-
-**Resultado del benchmark B3.64.3:**
-- STATUS: **OK**
-- Tiempo total: 796.649 ms
-- Tokens/second: 6.28
-- Todos los parámetros RoPE son válidos
-- D2H transfers funcionando correctamente
-
-**Artifacts Reference**: `artifacts_remote/2026-02-07/b3_64/`
-**Status**: **CLOSED**
+[See docs/AMD/INDEX.md for full list]
 
 ---
-
-## 2026-02-07 - B3.66: Prefill vs Decode Drift Probe (COMPLETED)
-
-| Field | Value |
-|-------|-------|
-| **Date** | 2026-02-07 |
-| **Commit** | `56b755a` |
-| **Status** | COMPLETED |
-| **Root Cause** | `ATTENTION_COMPUTATION_MISMATCH` |
-| **Result** | FAIL (expected - prefill vs decode paths differ) |
-| **Objective** | Identify first tensor/stage divergence between prefill_last and decode0 |
-| **AMD Report** | `docs/AMD/2026_02_07_B3_66_prefill_decode_drift_probe.md` |
-| **Artifacts** | `artifacts_remote/2026-02-07/B3_66_FINAL_REPORT.md` |
-
-### Results Summary
-
-| Metric | Value |
-|--------|-------|
-| Total Pairs | 48 |
-| Pass | 6 (12.5%) |
-| Fail | 42 (87.5%) |
-
-### Failure Breakdown
-
-| Root Cause | Count |
-|------------|-------|
-| ATTN_OUT_DRIFT | 15 |
-| MLP_OUT_DRIFT | 15 |
-| X_IN_DRIFT | 12 |
-
-### First Failure
-
-- **Tensor**: attn_out
-- **Layer**: 0
-- **Prompt**: p0_short
-
-### Root Cause Analysis
-
-El drift se origina en la computación de atención:
-- Prefill usa atención de secuencia completa (38 tokens)
-- Decode usa atención de token único (1 token)
-- Los patrones de atención difieren, causando diferentes attn_out
-- El drift se propaga a través de conexiones residuales
-
-### Conclusion
-
-**ROOT_CAUSE**: ATTENTION_COMPUTATION_MISMATCH (esperado)
-**NEXT_STEP**: N/A - B3.66 completado
 
 Signed: L.E.T / Leandro Emanuel Timberini
-
----
-
-## Closed Tickets
-
-### B3.64: D2H Illegal Memory Access → RoPE Kernel Fault (FIXED)
-- **ETAPA**: ROOT_CAUSE FOUND AND FIXED
-- **ERROR**: "RoPE Q launch failed: an illegal memory access was encountered"
-- **ROOT CAUSE**: `d_pos` buffer type mismatch (FP16 allocated, uint32_t stored)
-- **FIX**: `FP16` → `FP32` at `block_scheduler.cpp:1645`
-- **VERIFICATION**: 20/20 stability sweep PASSED
-- **PRÓXIMO**: B3.66 - Prefill vs Decode Drift Probe
