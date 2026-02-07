@@ -135,6 +135,7 @@ inline bool greta_hip_memcpy_d2h_safe_sync(
     }
 
     // Requisito 3: Log estructurado antes del memcpy
+    std::cerr << "[D2H_SAFE_WRAPPER] engaged for tensor=" << meta.tensor_name << "\n";
     std::cerr << "[D2H_CHECK] tensor=" << meta.tensor_name
               << " step=" << meta.step
               << " layer=" << meta.layer
