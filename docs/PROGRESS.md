@@ -8,7 +8,7 @@
 
 | Phase | Date | HEAD Hash | Objective | Root Cause | Result | Artifacts | AMD Report |
 |-------|------|-----------|-----------|------------|--------|-----------|------------|
-| **B3.66** | 2026-02-07 | `56b755a` | Prefill vs Decode Drift Probe | N/A | **IMPLEMENTED_PENDING_RUN** | N/A | [2026_02_07_B3_66](docs/AMD/2026_02_07_B3_66_prefill_decode_drift_probe.md) |
+| **B3.66** | 2026-02-07 | `56b755a` | Prefill vs Decode Drift Probe | `ATTENTION_COMPUTATION_MISMATCH` | **FAIL (EXPECTED)** | [b3_66_final](artifacts_remote/2026-02-07/B3_66_FINAL_REPORT.md) | [2026_02_07_B3_66](docs/AMD/2026_02_07_B3_66_prefill_decode_drift_probe.md) |
 | **B3.65** | 2026-02-07 | `d28ea0e` | Decode Determinism Audit | N/A | **PASS_DETERMINISTIC** | N/A | [B3.65_Analysis](artifacts_remote/2026-02-07/B3_65_FINAL_REPORT.md) |
 | **B3.64** | 2026-02-07 | `d28ea0e` | RoPE Kernel Launch Diagnostics | `BUFFER_TYPE_MISMATCH (d_pos FP16→FP32)` | **CLOSED** | [stability](artifacts_remote/2026-02-07/b3_64/stability/) | [b3_64_audit](docs/AMD/2026_02_06_B3_64_numerical_drift_audit.md) |
 | B3.63 | 2026-02-06 | `e09989c` | HIP D2H Root Cause Fix | `ASYNC_D2H_RACE` | **INCOMPLETE** ⚠️ | N/A | [d2h_safe.hpp](src/inference/include/gcore/inference/d2h_safe.hpp) |
@@ -53,26 +53,53 @@ See [docs/AMD/INDEX.md](docs/AMD/INDEX.md) for full index with categories and li
 
 ---
 
-## 2026-02-07 - B3.66: Prefill vs Decode Drift Probe
+## 2026-02-07 - B3.66: Prefill vs Decode Drift Probe (COMPLETED)
 
 | Field | Value |
 |-------|-------|
 | **Date** | 2026-02-07 |
 | **Commit** | `56b755a` |
-| **Status** | IMPLEMENTED_PENDING_RUN |
+| **Status** | COMPLETED |
+| **Root Cause** | `ATTENTION_COMPUTATION_MISMATCH` |
+| **Result** | FAIL (expected - prefill vs decode paths differ) |
 | **Objective** | Identify first tensor/stage divergence between prefill_last and decode0 |
 | **AMD Report** | `docs/AMD/2026_02_07_B3_66_prefill_decode_drift_probe.md` |
-| **Artifacts** | `artifacts_remote/YYYY-MM-DD/b3_66/{run,traces}/` |
+| **Artifacts** | `artifacts_remote/2026-02-07/B3_66_FINAL_REPORT.md` |
 
-### Scripts
-- `tools/benchmarks/run_b3_66_mi300x.sh` - Remote runner with build + trace collection
-- `tools/benchmarks/analyze_b3_66_prefill_decode_drift.py` - Strict pairing + first-fail verdict
+### Results Summary
 
-### Next Steps
-1. Run `./tools/benchmarks/run_b3_66_mi300x.sh 129.212.184.200 2026-02-07`
-2. Copy artifacts back
-3. Run analyzer
-4. Update ROOT_CAUSE in AMD report
+| Metric | Value |
+|--------|-------|
+| Total Pairs | 48 |
+| Pass | 6 (12.5%) |
+| Fail | 42 (87.5%) |
+
+### Failure Breakdown
+
+| Root Cause | Count |
+|------------|-------|
+| ATTN_OUT_DRIFT | 15 |
+| MLP_OUT_DRIFT | 15 |
+| X_IN_DRIFT | 12 |
+
+### First Failure
+
+- **Tensor**: attn_out
+- **Layer**: 0
+- **Prompt**: p0_short
+
+### Root Cause Analysis
+
+El drift se origina en la computación de atención:
+- Prefill usa atención de secuencia completa (38 tokens)
+- Decode usa atención de token único (1 token)
+- Los patrones de atención difieren, causando diferentes attn_out
+- El drift se propaga a través de conexiones residuales
+
+### Conclusion
+
+**ROOT_CAUSE**: ATTENTION_COMPUTATION_MISMATCH (esperado)
+**NEXT_STEP**: N/A - B3.66 completado
 
 Signed: L.E.T / Leandro Emanuel Timberini
 
