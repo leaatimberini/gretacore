@@ -56,7 +56,11 @@ bool Buffer::copy_to_device(const void *host_ptr, size_t size,
 }
 
 bool Buffer::copy_to_host(void *host_ptr, size_t size, std::string *err) const {
-  bool res = greta_d2h_safe::safe_hipMemcpy(host_ptr, ptr_, size, hipMemcpyDeviceToHost, "buffer_copy_to_host");
+  greta_d2h_safe::D2HMetadata meta;
+  meta.tensor_name = "buffer";
+  meta.size_bytes = size;
+  meta.alloc_bytes = size_;
+  bool res = greta_d2h_safe::greta_hip_memcpy_d2h_safe_sync(host_ptr, ptr_, size, hipMemcpyDeviceToHost, meta);
   if (!res) {
     if (err)
       *err = "hipMemcpy D2H failed";
@@ -75,7 +79,12 @@ bool Buffer::copy_to_host_offset(void *host_ptr, size_t offset, size_t size,
     return false;
   }
   char *device_ptr = static_cast<char *>(ptr_) + offset;
-  bool res = greta_d2h_safe::safe_hipMemcpy(host_ptr, device_ptr, size, hipMemcpyDeviceToHost, "buffer_copy_to_host_offset");
+  greta_d2h_safe::D2HMetadata meta;
+  meta.tensor_name = "buffer_offset";
+  meta.offset_bytes = offset;
+  meta.size_bytes = size;
+  meta.alloc_bytes = size_;
+  bool res = greta_d2h_safe::greta_hip_memcpy_d2h_safe_sync(host_ptr, device_ptr, size, hipMemcpyDeviceToHost, meta);
   if (!res) {
     if (err)
       *err = "hipMemcpy D2H failed";

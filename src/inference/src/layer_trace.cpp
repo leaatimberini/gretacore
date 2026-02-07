@@ -216,8 +216,13 @@ void LayerTracer::trace_tensor(const char *tag, int step, int layer,
     return;
 
   std::vector<float> host(n);
-  greta_d2h_safe::safe_hipMemcpyAsync(host.data(), d, n * sizeof(float), hipMemcpyDeviceToHost,
-                     stream, "layer_trace_f32");
+  greta_d2h_safe::D2HMetadata meta;
+  meta.tensor_name = tag;
+  meta.step = step;
+  meta.layer = layer;
+  meta.size_bytes = n * sizeof(float);
+  greta_d2h_safe::greta_hip_memcpy_d2h_safe(host.data(), d, n * sizeof(float), hipMemcpyDeviceToHost,
+                     stream, meta);
 
   F32Stats s = stats_f32(host.data(), n);
   uint64_t h = hash_f32(host.data(), n);
@@ -250,8 +255,13 @@ void LayerTracer::trace_tensor_f16(const char *tag, int step, int layer,
     return;
 
   std::vector<__half> host_half(n);
-  greta_d2h_safe::safe_hipMemcpyAsync(host_half.data(), d, n * sizeof(__half),
-                     hipMemcpyDeviceToHost, stream, "layer_trace_f16");
+  greta_d2h_safe::D2HMetadata meta;
+  meta.tensor_name = tag;
+  meta.step = step;
+  meta.layer = layer;
+  meta.size_bytes = n * sizeof(__half);
+  greta_d2h_safe::greta_hip_memcpy_d2h_safe(host_half.data(), d, n * sizeof(__half),
+                     hipMemcpyDeviceToHost, stream, meta);
 
   std::vector<float> host(n);
   for (uint32_t i = 0; i < n; ++i) {

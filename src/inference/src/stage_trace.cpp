@@ -217,8 +217,14 @@ void stage_trace_tensor(const char *point, const char *phase,
       std::min<uint32_t>(cfg.sample, static_cast<uint32_t>(stride_elems));
   std::vector<float> host(sample_n, 0.0f);
   if (sample_n > 0) {
-    greta_d2h_safe::safe_hipMemcpyAsync(host.data(), ptr, sample_n * sizeof(float),
-                   hipMemcpyDeviceToHost, stream, "stage_trace_post_wo");
+    greta_d2h_safe::D2HMetadata meta;
+    meta.tensor_name = point;
+    meta.step = step;
+    meta.layer = layer;
+    meta.offset_bytes = offset_elems * sizeof(float);
+    meta.size_bytes = sample_n * sizeof(float);
+    greta_d2h_safe::greta_hip_memcpy_d2h_safe(host.data(), ptr, sample_n * sizeof(float),
+                   hipMemcpyDeviceToHost, stream, meta);
   }
   const F32Stats stats = stats_f32(host.data(), host.size());
   const uint64_t hash = hash_f32(host.data(), host.size());
