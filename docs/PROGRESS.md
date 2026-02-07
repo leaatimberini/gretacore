@@ -56,6 +56,31 @@ See [docs/AMD/INDEX.md](docs/AMD/INDEX.md) for full index with categories and li
 
 ---
 
+## 2026-02-07 - B3.66: Prefill vs Decode Drift Probe
+
+| Field | Value |
+|-------|-------|
+| **Date** | 2026-02-07 |
+| **Commit** | (pending) |
+| **Status** | IMPLEMENTED_PENDING_RUN |
+| **Objective** | Identify first tensor/stage divergence between prefill_last and decode0 |
+| **AMD Report** | `docs/AMD/2026_02_07_B3_66_prefill_decode_drift_probe.md` |
+| **Artifacts** | `artifacts_remote/YYYY-MM-DD/b3_66/{run,traces}/` |
+
+### Scripts
+- `tools/benchmarks/run_b3_66_mi300x.sh` - Remote runner with build + trace collection
+- `tools/benchmarks/analyze_b3_66_prefill_decode_drift.py` - Strict pairing + first-fail verdict
+
+### Next Steps
+1. Run `./tools/benchmarks/run_b3_66_mi300x.sh 129.212.184.200 2026-02-07`
+2. Copy artifacts back
+3. Run analyzer
+4. Update ROOT_CAUSE in AMD report
+
+Signed: L.E.T / Leandro Emanuel Timberini
+
+---
+
 ## Closed Tickets
 
 ### B3.64: D2H Illegal Memory Access → RoPE Kernel Fault (FIXED)
