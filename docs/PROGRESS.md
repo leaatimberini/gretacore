@@ -16,11 +16,18 @@
 
 ---
 
-## Sync Status
+## Sync Status (2026-02-07)
 
-Repo HEAD (main): `1f662f1a9cb8e82365ba9e0cc3ad24ccde003dd3`
-B3.66 implementation commit: `56b755a`
-Docs updates: `1342409`, `fde8471`
+**Repo HEAD (main)**: `a70ac354055501c7c08d7914b00371bb566bbfe8`
+
+**Implementation Commits (por ticket)**:
+- B3.66 implementation: `56b755a`
+- Docs index normalization: `1f662f1`
+- Docs reconcile HEAD: `23c36b1`
+
+**Nota / Note**:
+- ES: Repo HEAD es el snapshot actual del repositorio; los commits de implementación por ticket se mantienen separados para trazabilidad.
+- EN: Repo HEAD is the current repository snapshot; per-ticket implementation commits are kept separate for traceability.
 
 ---
 
