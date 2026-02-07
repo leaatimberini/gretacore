@@ -2099,12 +2099,12 @@ bool BlockScheduler::execute_layer(size_t layer_idx, size_t seq_start,
           "RoPE K");
     } else {
       // B3.64 DIAG: Validar parametros RoPE Q prefill
-      greta_rope_diag::validate_rope_params(q, S, Hq, Dh, config_.rope_base, pos, "RoPE Q prefill");
+      greta_rope_diag::validate_rope_params(q, S, Hq, Dh, config_.rope_base, d_pos, "RoPE Q prefill");
       CHECK_HIP_KERNEL(
           launch_rope(hip_stream, q, S, Hq, Dh, config_.rope_base, pos),
           "RoPE Q");
       // B3.64 DIAG: Validar parametros RoPE K prefill
-      greta_rope_diag::validate_rope_params(k, S, Hkv, Dh, config_.rope_base, pos, "RoPE K prefill");
+      greta_rope_diag::validate_rope_params(k, S, Hkv, Dh, config_.rope_base, d_pos, "RoPE K prefill");
       CHECK_HIP_KERNEL(
           launch_rope(hip_stream, k, S, Hkv, Dh, config_.rope_base, pos),
           "RoPE K");
