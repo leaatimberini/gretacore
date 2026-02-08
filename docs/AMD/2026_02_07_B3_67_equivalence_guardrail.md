@@ -309,30 +309,79 @@ For equivalence comparison, both prefill and decode must dump the **same** token
 > This is intentional to ensure robust, unambiguous comparison between prefill and decode.
 > Full-span comparison (gen_len > 1) may be added in a future ticket (B3.69).
 
-### Dependency: B3.68 (greta_infer kv_aligned)
-MI300X execution requires `GRETA_KV_ALIGNED` flag in greta_infer. Until B3.68 is implemented:
-- Cannot generate real logits with KV alignment
-- Current results use synthetic data (expected to fail thresholds)
+---
 
-### How to Run MI300X Full Matrix
+## MI300X Runbook
 
-Once B3.68 is complete:
+### Runner Script (v2 - uses B3.68 --dump-logits)
+
+The B3.67 runner now uses `greta_infer --dump-logits` (B3.68 feature) instead of the legacy `GRETA_TRACE_B3_66` environment variable.
+
 ```bash
-# Full matrix run
+# Full matrix run (12 runs: kv ∈ {0,1} × seeds ∈ {0,1,2} × modes ∈ {prefill,decode})
 ./tools/benchmarks/run_b3_67_equivalence_guardrail.sh <MI300X_IP>
 
-# Single run for debugging
+# Custom run with specific parameters
+./tools/benchmarks/run_b3_67_equivalence_guardrail.sh <MI300X_IP> 2026-02-07 --kv_aligned 1 --seeds "0"
+```
+
+### Output Structure
+
+```
+artifacts_remote/<DATE>/b3_67/
+├── config.json              # Matrix definition (enables completeness guardrail)
+├── runs/
+│   ├── kv_aligned_0/
+│   │   ├── seed_0/
+│   │   │   ├── prefill/
+│   │   │   │   ├── metadata.json
+│   │   │   │   └── logits.jsonl.gz
+│   │   │   └── decode/
+│   │   │       ├── metadata.json
+│   │   │       └── logits.jsonl.gz
+│   │   └── seed_1/...
+│   └── kv_aligned_1/...
+└── B3_67_EQUIVALENCE_GUARDRAIL.md
+```
+
+### Manual Run (Single Configuration)
+
+```bash
 ssh root@<MI300X_IP> "
   cd /root/gretacore
-  export GRETA_KV_ALIGNED=1
+  mkdir -p /tmp/logits_test
+
   ./tools/inference/build/greta_infer \\
     --model ./models/greta-v1.gguf \\
     --prompt tools/benchmarks/prompts/p0_short.txt \\
     --max-tokens 1 \\
+    --seed 42 \\
+    --kv-aligned 1 \\
     --mode prefill \\
-    --dump-logits /tmp/logits_prefill
+    --dump-logits /tmp/logits_test \\
+    --greedy
+
+  cat /tmp/logits_test/metadata.json
 "
 ```
+
+### Expected Verdicts
+
+| kv_aligned | Expected Verdict | Rationale |
+|------------|-----------------|-----------|
+| 0 | EXPECTED_DRIFT | Without KV alignment, prefill vs decode produces different hidden states |
+| 1 | PASS_EQUIV | With KV alignment, hidden states should be numerically equivalent |
+
+### Key Changes from v1
+
+| v1 (B3.66 format) | v2 (B3.68 format) |
+|-------------------|-------------------|
+| `GRETA_TRACE_B3_66=1` | `--dump-logits <DIR>` |
+| Hidden states only | Full logits + metadata |
+| No token_span | `token_span: {"start": prompt_len, "count": 1}` |
+| Per-run config.json | Root config.json + per-run metadata.json |
+
+---
 
 ## Changelog
 
@@ -340,9 +389,10 @@ ssh root@<MI300X_IP> "
 |-------|-------|--------|
 | 2026-02-07 | L.E.T | Creación inicial |
 | 2026-02-07 | L.E.T | Add completeness guardrail, summary.json, pairing validation |
+| 2026-02-08 | L.E.T | v2: Runner uses B3.68 --dump-logits, emits root config.json |
 
 ## Referencias
 
 - B3.66: Prefill vs Decode Drift Probe
-- B3.66 v2: kv_aligned Mode Probe
+- B3.68: greta_infer kv_aligned + logits dump
 - docs/PROGRESS.md: Estado del benchmark
