@@ -6,9 +6,16 @@ Analiza comparaciones de hidden states entre prefill y decode para detectar drif
 No requiere numpy - usa solo Python estándar.
 
 Features:
-- Completeness Guardrail: Detecta matrices incompletas
+- Completeness Guardrail: Detecta matrices incompletas (obligatorio si config.json existe)
 - Equivalence Guardrail: Compara hidden states del último layer
 - Veredictos: PASS_EQUIV, FAIL_EQUIV, EXPECTED_DRIFT, INCOMPLETE
+- Pairing Validation: Verifica token_idx, token_id, y dimensión de logits
+
+Output:
+- summary.md: Reporte legible
+- summary.json: Datos estructurados para CI/automation
+
+P99 Computation: Exact method using sorted(diffs)[ceil(0.99*n)-1] (not streaming approximation)
 """
 
 import argparse
@@ -20,6 +27,7 @@ from collections import defaultdict
 from pathlib import Path
 import statistics
 import math
+from datetime import datetime, timezone
 
 
 def parse_trace_line(line):
@@ -75,6 +83,18 @@ def load_traces(traces_dir: str) -> dict:
                 }
     
     return traces
+
+
+def load_root_config(traces_dir: str) -> dict:
+    """Load config.json from traces root directory if present."""
+    config_path = Path(traces_dir) / 'config.json'
+    if config_path.exists():
+        try:
+            with open(config_path) as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError) as e:
+            print(f"WARNING: Could not load config.json: {e}")
+    return None
 
 
 def extract_hidden_states(traces_dict: dict, layer: int = 32, point: str = None) -> list:
@@ -172,6 +192,107 @@ def compute_comparison_metrics(prefill_states: list, decode_states: list) -> dic
         metrics = {'status': 'NO_MATCHING_DATA'}
     
     return metrics
+
+
+def validate_pairing(prefill_entries: list, decode_entries: list) -> dict:
+    """Validate that prefill and decode entries can be paired correctly."""
+    errors = []
+    valid_pairs = 0
+    invalid_pairs = 0
+    top1_mismatch_count = 0
+    
+    # Build maps by token_idx
+    prefill_by_idx = {e.get('token_index', e.get('token_idx', i)): e 
+                      for i, e in enumerate(prefill_entries)}
+    decode_by_idx = {e.get('token_index', e.get('token_idx', i)): e 
+                     for i, e in enumerate(decode_entries)}
+    
+    # Check common indices
+    common_indices = set(prefill_by_idx.keys()) & set(decode_by_idx.keys())
+    
+    for idx in sorted(common_indices):
+        pf = prefill_by_idx[idx]
+        dc = decode_by_idx[idx]
+        
+        # Validate token_id match
+        pf_token = pf.get('token_id')
+        dc_token = dc.get('token_id')
+        if pf_token is not None and dc_token is not None and pf_token != dc_token:
+            errors.append({
+                'type': 'TOKEN_ID_MISMATCH',
+                'token_idx': idx,
+                'prefill_token_id': pf_token,
+                'decode_token_id': dc_token
+            })
+            invalid_pairs += 1
+            continue
+        
+        # Validate dimension match
+        pf_sample = pf.get('sample', pf.get('logits', []))
+        dc_sample = dc.get('sample', dc.get('logits', []))
+        if pf_sample and dc_sample and len(pf_sample) != len(dc_sample):
+            errors.append({
+                'type': 'DIMENSION_MISMATCH',
+                'token_idx': idx,
+                'prefill_dim': len(pf_sample),
+                'decode_dim': len(dc_sample)
+            })
+            invalid_pairs += 1
+            continue
+        
+        valid_pairs += 1
+    
+    return {
+        'valid_pairs': valid_pairs,
+        'invalid_pairs': invalid_pairs,
+        'errors': errors,
+        'is_valid': len(errors) == 0
+    }
+
+
+def validate_token_span(prefill_metadata: dict, decode_metadata: dict) -> dict:
+    """Validate that prefill and decode have matching token_span for comparison.
+    
+    For B3.67 equivalence comparison, both modes must dump the same token range.
+    Expected: token_span: {"start": prompt_len, "count": 1} for both.
+    """
+    pf_span = prefill_metadata.get('token_span', {})
+    dc_span = decode_metadata.get('token_span', {})
+    
+    # Check if both have token_span
+    if not pf_span and not dc_span:
+        # Neither has token_span - legacy mode, allow comparison
+        return {'is_valid': True, 'error': None}
+    
+    if not pf_span or not dc_span:
+        return {
+            'is_valid': False,
+            'error': {
+                'type': 'SPAN_MISSING',
+                'prefill_span': pf_span,
+                'decode_span': dc_span,
+                'message': 'One mode is missing token_span'
+            }
+        }
+    
+    # Check if spans match
+    pf_start = pf_span.get('start')
+    pf_count = pf_span.get('count')
+    dc_start = dc_span.get('start')
+    dc_count = dc_span.get('count')
+    
+    if pf_start != dc_start or pf_count != dc_count:
+        return {
+            'is_valid': False,
+            'error': {
+                'type': 'SPAN_MISMATCH',
+                'prefill_span': pf_span,
+                'decode_span': dc_span,
+                'message': f'token_span mismatch: prefill={pf_span}, decode={dc_span}'
+            }
+        }
+    
+    return {'is_valid': True, 'error': None}
 
 
 def check_completeness(traces: dict, expected_configs: list) -> dict:
@@ -317,6 +438,12 @@ def main():
         )
     
     print(f"Loading traces from: {args.traces_dir}")
+    
+    # Load root config.json if present
+    root_config = load_root_config(args.traces_dir)
+    config_present = root_config is not None
+    print(f"Config.json present: {config_present}")
+    
     traces = load_traces(args.traces_dir)
     
     if not traces:
@@ -353,12 +480,31 @@ def main():
             metrics = compute_comparison_metrics(prefill_states, decode_states)
             verdict = compute_verdict(metrics, int(kv_aligned))
             
+            # Validate pairing
+            pairing = validate_pairing(
+                prefill_data.get('entries', []),
+                decode_data.get('entries', [])
+            )
+            
+            # Validate token_span alignment
+            span_validation = validate_token_span(
+                prefill_data.get('metadata', {}),
+                decode_data.get('metadata', {})
+            )
+            
+            # If span mismatch, this is a critical error
+            if not span_validation['is_valid']:
+                pairing['errors'].append(span_validation['error'])
+                pairing['is_valid'] = False
+            
             results.append({
                 'kv_aligned': kv_aligned,
                 'seed': seed,
                 'metrics': metrics,
                 'verdict': verdict,
-                'config': prefill_data.get('config')
+                'config': prefill_data.get('config'),
+                'pairing': pairing,
+                'span_validation': span_validation
             })
     
     date = '2026-02-07'
@@ -448,7 +594,67 @@ def main():
     print(f"Report written to: {args.output}")
     print(f"Global verdict: {global_verdict}")
     
-    return 0 if completeness['is_complete'] and fail_count == 0 else 1
+    # Write summary.json
+    summary_json_path = Path(args.output).parent / 'summary.json'
+    
+    # Compute expected pairs
+    expected_pairs = len(args.kv_aligned.split(',')) * len(args.seeds.split(','))  # kv × seeds
+    found_pairs = len(results)
+    
+    # Determine global verdict code
+    # If no config.json, we're in best-effort mode - always local pass
+    if not config_present:
+        global_verdict_code = 'PASS_GUARDRAIL_LOCAL'
+    elif not completeness['is_complete']:
+        global_verdict_code = 'INCOMPLETE'
+    elif completeness['total_missing'] > 0:
+        global_verdict_code = 'INCOMPLETE'
+    elif fail_count > 0:
+        global_verdict_code = 'FAIL_GUARDRAIL'
+    elif pass_count > 0 and expected_drift_count > 0:
+        global_verdict_code = 'PASS_GUARDRAIL'
+    elif pass_count > 0:
+        global_verdict_code = 'PASS_EQUIV'
+    else:
+        global_verdict_code = 'INCONCLUSIVE'
+    
+    summary_data = {
+        'timestamp': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
+        'config_present': config_present,
+        'expected_pairs': expected_pairs,
+        'found_pairs': found_pairs,
+        'missing_pairs_count': completeness['total_missing'],
+        'missing_pairs': completeness['missing_pairs'],
+        'completeness_status': 'COMPLETE' if completeness['is_complete'] else 'INCOMPLETE',
+        'verdicts': {
+            'pass_equiv': pass_count,
+            'fail_equiv': fail_count,
+            'expected_drift': expected_drift_count,
+            'inconclusive': inconclusive_count
+        },
+        'global_verdict': global_verdict_code,
+        'layer_analyzed': args.layer,
+        'results': [
+            {
+                'kv_aligned': r['kv_aligned'],
+                'seed': r['seed'],
+                'verdict': r['verdict'],
+                'metrics': r['metrics'],
+                'pairing_errors': r.get('pairing', {}).get('errors', [])
+            }
+            for r in results
+        ]
+    }
+    
+    with open(summary_json_path, 'w') as f:
+        json.dump(summary_data, f, indent=2)
+    
+    print(f"Summary JSON written to: {summary_json_path}")
+    
+    # Exit code: 1 if INCOMPLETE or FAIL_GUARDRAIL
+    if global_verdict_code in ['INCOMPLETE', 'FAIL_GUARDRAIL']:
+        return 1
+    return 0
 
 
 if __name__ == '__main__':

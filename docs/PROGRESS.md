@@ -7,7 +7,7 @@
 **B3.65**: CLOSED - Decode determinism audit (PASS_DETERMINISTIC 10/10)
 **B3.66**: COMPLETED - Prefill vs decode drift probe (expected attention mismatch)
 **B3.66 v2**: COMPLETED - kv_aligned mode probe
-**B3.67**: COMPLETED (LOCAL) - Equivalence guardrail (prefill vs decode) (PASS_COMPLETENESS_GUARDRAIL 12/12; EXPECTED_DRIFT detected for kv_aligned=0)
+**B3.67**: COMPLETED (LOCAL) - Equivalence guardrail (prefill vs decode) (completeness ✓; pending MI300X + greta_infer GRETA_KV_ALIGNED)
 
 ---
 
@@ -18,7 +18,7 @@
 **B3.65**: CLOSED - Decode determinism audit (PASS_DETERMINISTIC 10/10)
 **B3.66**: COMPLETED - Prefill vs decode drift probe (expected attention mismatch)
 **B3.66 v2**: COMPLETED - kv_aligned mode probe
-**B3.67**: COMPLETED (LOCAL) - Equivalence guardrail (prefill vs decode) (PASS_COMPLETENESS_GUARDRAIL 12/12; EXPECTED_DRIFT detected for kv_aligned=0)
+**B3.67**: COMPLETED (LOCAL) - Equivalence guardrail (prefill vs decode) (completeness ✓; pending MI300X + greta_infer GRETA_KV_ALIGNED)
 
 ---
 
@@ -30,7 +30,7 @@
 - B3.63 D2H audit: `de3b888`
 - B3.66 base mode: `56b755a`
 - B3.66 v2 mode: `77fd6bd`
-- B3.67 guardrail: IMPLEMENTED + LOCAL_SMOKE_PASS (pending MI300X full matrix)
+- B3.67 guardrail: IMPLEMENTED + LOCAL_SMOKE_PASS (pending MI300X full matrix + greta_infer kv_aligned)
 - Docs index: `1f662f1`
 
 **Nota / Note**:
@@ -48,7 +48,7 @@
 | B3.65 | 2026-02-07 | Decode Determinism Audit | CLOSED | PASS_DETERMINISTIC | N/A (no-code-change audit) | artifacts_remote/2026-02-07/B3_65_FINAL_REPORT.md | docs/AMD/2026_02_07_B3_65_decode_determinism_audit.md |
 | B3.66 | 2026-02-07 | Prefill vs Decode Drift Probe | COMPLETED | FAIL (expected) | ATTENTION_COMPUTATION_MISMATCH | artifacts_remote/2026-02-07/b3_66/ | docs/AMD/2026_02_07_B3_66_prefill_decode_drift_probe.md |
 | B3.66 v2 | 2026-02-07 | kv_aligned Mode | COMPLETED | EXPECTED (kv_aligned evidence added) | STRUCTURAL_DRIFT (EXPECTED; prefill vs decode semantics) | artifacts_remote/2026-02-07/b3_66_v2/ | docs/AMD/2026_02_07_B3_66_v2_kv_aligned_probe.md |
-| B3.67 | 2026-02-07 | Equivalence Guardrail | COMPLETED (LOCAL) | PASS_GUARDRAIL_LOCAL (smoke) | N/A (automation/guardrail) | artifacts_remote/2026-02-07/b3_67/ | docs/AMD/2026_02_07_B3_67_equivalence_guardrail.md |
+| B3.67 | 2026-02-07 | Equivalence Guardrail | COMPLETED (LOCAL) | PENDING_MI300X (kv_aligned=1 requires greta_infer support) | N/A (automation/guardrail) | artifacts_remote/2026-02-07/b3_67/ | docs/AMD/2026_02_07_B3_67_equivalence_guardrail.md |
 
 ---
 

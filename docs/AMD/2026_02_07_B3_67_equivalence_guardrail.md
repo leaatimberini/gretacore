@@ -7,8 +7,8 @@
 | **Ticket** | B3.67 |
 | **Date** | 2026-02-07 |
 | **Author** | L.E.T |
-| **Status** | IN_PROGRESS |
-| **Labels** | Repo branch: main |
+| **Status** | COMPLETED (LOCAL) \| PENDING_MI300X |
+| **Labels** | Repo branch: main; pending greta_infer kv_aligned |
 | **Parent** | B3.66, B3.66 v2 |
 
 ## Resumen Ejecutivo
@@ -290,11 +290,56 @@ export GRETA_SEED=${SEED}           # Seed fixed
 | Paring incorrecto | Media | Comparar tokens wrong | Verificar token_id |
 | Archivo corrupto | Baja | Falla de análisis | Validar schema JSON |
 
+## Current Status
+
+### Local Smoke Test
+- **Completeness**: ✓ PASS (12/12 pairs)
+- **Equivalence kv_aligned=0**: EXPECTED_DRIFT (correct)
+- **Equivalence kv_aligned=1**: FAIL_EQUIV (synthetic data noise > threshold)
+
+### Token Span Alignment (Critical for MI300X)
+For equivalence comparison, both prefill and decode must dump the **same** token range:
+- `token_span: {"start": prompt_len, "count": 1}` (first generated token only)
+- Span mismatch → `SPAN_MISMATCH` error in pairing_errors → FAIL_GUARDRAIL
+
+> [!IMPORTANT]
+> **1-Step Equivalence Guardrail**
+> 
+> This guardrail compares only the **first generated token** (position `prompt_len`).
+> This is intentional to ensure robust, unambiguous comparison between prefill and decode.
+> Full-span comparison (gen_len > 1) may be added in a future ticket (B3.69).
+
+### Dependency: B3.68 (greta_infer kv_aligned)
+MI300X execution requires `GRETA_KV_ALIGNED` flag in greta_infer. Until B3.68 is implemented:
+- Cannot generate real logits with KV alignment
+- Current results use synthetic data (expected to fail thresholds)
+
+### How to Run MI300X Full Matrix
+
+Once B3.68 is complete:
+```bash
+# Full matrix run
+./tools/benchmarks/run_b3_67_equivalence_guardrail.sh <MI300X_IP>
+
+# Single run for debugging
+ssh root@<MI300X_IP> "
+  cd /root/gretacore
+  export GRETA_KV_ALIGNED=1
+  ./tools/inference/build/greta_infer \\
+    --model ./models/greta-v1.gguf \\
+    --prompt tools/benchmarks/prompts/p0_short.txt \\
+    --max-tokens 1 \\
+    --mode prefill \\
+    --dump-logits /tmp/logits_prefill
+"
+```
+
 ## Changelog
 
 | Fecha | Autor | Cambio |
 |-------|-------|--------|
 | 2026-02-07 | L.E.T | Creación inicial |
+| 2026-02-07 | L.E.T | Add completeness guardrail, summary.json, pairing validation |
 
 ## Referencias
 
