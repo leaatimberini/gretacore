@@ -383,6 +383,58 @@ ssh root@<MI300X_IP> "
 
 ---
 
+## MI300X Results (2026-02-08)
+
+### Full Matrix Execution
+
+| Parameter | Value |
+|-----------|-------|
+| Node | MI300X (129.212.184.200) |
+| Matrix | kv ∈ {0,1} × seeds ∈ {0,1,2} × modes ∈ {prefill,decode} |
+| Total runs | 12 |
+| Failed runs | 0 |
+| Config present | ✓ True |
+| Completeness | COMPLETE (6/6 pairs) |
+
+### Verdict Breakdown
+
+| kv_aligned | seed=0 | seed=1 | seed=2 | Total |
+|------------|--------|--------|--------|-------|
+| 0 | EXPECTED_DRIFT | EXPECTED_DRIFT | EXPECTED_DRIFT | 3/3 |
+| 1 | PASS_EQUIV_METADATA | PASS_EQUIV_METADATA | PASS_EQUIV_METADATA | 3/3 |
+
+### Aggregated Results
+
+| Verdict | Count |
+|---------|-------|
+| PASS_EQUIV (metadata) | 3 |
+| EXPECTED_DRIFT | 3 |
+| FAIL_EQUIV | 0 |
+| INCONCLUSIVE | 0 |
+
+**Global Verdict:** `PASS_GUARDRAIL` (exit code 0)
+
+> [!IMPORTANT]
+> **Metadata-Only Equivalence**
+> 
+> The current `PASS_EQUIV_METADATA` verdict confirms that prefill and decode
+> modes produce consistent metadata (token_span, prompt_len, gen_len=1).
+> Full logits-diff gate can be enabled in a future extension (B3.69).
+
+### Artifacts Location
+
+```
+artifacts_remote/2026-02-08/b3_67/
+├── B3_67_EQUIVALENCE_GUARDRAIL.md
+├── summary.json
+└── runs/
+    ├── config.json
+    ├── kv_aligned_0/{seed_0,seed_1,seed_2}/{prefill,decode}/
+    └── kv_aligned_1/{seed_0,seed_1,seed_2}/{prefill,decode}/
+```
+
+---
+
 ## Changelog
 
 | Fecha | Autor | Cambio |
@@ -390,6 +442,7 @@ ssh root@<MI300X_IP> "
 | 2026-02-07 | L.E.T | Creación inicial |
 | 2026-02-07 | L.E.T | Add completeness guardrail, summary.json, pairing validation |
 | 2026-02-08 | L.E.T | v2: Runner uses B3.68 --dump-logits, emits root config.json |
+| 2026-02-08 | L.E.T | MI300X full matrix: PASS_GUARDRAIL (12/12 runs, 0 failed) |
 
 ## Referencias
 
