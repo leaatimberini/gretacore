@@ -20,13 +20,21 @@ set -euo pipefail
 # =============================================================================
 
 # -----------------------------------------------------------------------------
-# Argument parsing
+# Argument parsing (robust: detect flags vs positional date)
 # -----------------------------------------------------------------------------
 NODE_IP="${1:-129.212.184.200}"
-DATE="${2:-$(date +%Y-%m-%d)}"
 
-# Shift args to process only mode-related arguments
-shift $(( $# > 2 ? 2 : 0 )) 2>/dev/null || true
+# Check if second argument is a flag (starts with --) or a date
+# If it's a flag or missing, use today's date
+if [[ -z "${2:-}" || "${2:-}" == --* ]]; then
+    DATE=$(date +%Y-%m-%d)
+    # Don't shift - arg2 is actually a flag
+    shift 1 2>/dev/null || true
+else
+    DATE="$2"
+    # Shift both host and date
+    shift 2 2>/dev/null || true
+fi
 
 KV_ALIGNED=""  # Empty means all values
 SEEDS="0,1,2"
