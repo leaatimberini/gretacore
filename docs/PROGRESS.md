@@ -12,7 +12,7 @@
 **B3.70**: COMPLETED - Drift characterization (PASS; diff=0.0, top1=1.0)
 **B3.71**: COMPLETED - Span escalation (PASS; 32→40s, 128→56s, 512→117s)
 **B3.72**: COMPLETED - Cross-dtype sweep bf16/fp16 (PASS; max_diff=0.0)
-**B3.73**: IN_PROGRESS - Reconcile B3.66 vs B3.69 (pending MI300X execution)
+**B3.73**: COMPLETED - Reconcile B3.66 vs B3.69 (RECONCILED_NO_LOGIT_DRIFT; MI300X full matrix; kv=0 diff=0.0)
 
 ---
 
@@ -28,7 +28,7 @@
 **B3.70**: COMPLETED - Drift characterization (PASS; diff=0.0, top1=1.0)
 **B3.71**: COMPLETED - Span escalation (PASS; 32→40s, 128→56s, 512→117s)
 **B3.72**: COMPLETED - Cross-dtype sweep bf16/fp16 (PASS; max_diff=0.0)
-**B3.73**: IN_PROGRESS - Reconcile B3.66 vs B3.69 (pending MI300X execution)
+**B3.73**: COMPLETED - Reconcile B3.66 vs B3.69 (RECONCILED_NO_LOGIT_DRIFT; MI300X full matrix; kv=0 diff=0.0)
 
 ---
 
