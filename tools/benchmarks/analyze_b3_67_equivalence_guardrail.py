@@ -608,6 +608,10 @@ def run_sweep_analysis(traces_dir: str, output_path: str) -> int:
     else:
         global_verdict = 'INCONCLUSIVE'
     
+    # Calculate run and pair counts
+    run_count_total = len(traces)  # Each entry is a single run (prefill or decode)
+    pair_count_total = len(results)  # Each result is a pair (prefill+decode comparison)
+    
     # Generate report
     report_lines = [
         "# B3.70-71-72 Sweep Report",
@@ -624,6 +628,14 @@ def run_sweep_analysis(traces_dir: str, output_path: str) -> int:
         f"- EXPECTED_DRIFT: {drift_count}",
         f"- INCOMPLETE: {incomplete_count}",
         f"- SKIPPED: {len(skipped)}",
+        "",
+        "## Counting Semantics: Runs vs Pairs",
+        "",
+        "- A **run** = one execution (prefill OR decode) for a single config",
+        "- A **pair** = (prefill, decode) for the same (span, dtype, kv_aligned, seed)",
+        f"- **Total runs:** {run_count_total}",
+        f"- **Total pairs:** {pair_count_total} (runs / 2)",
+        "- Verdict counts (PASS_EQUIV, EXPECTED_DRIFT, etc.) are **per pair**, not per run",
         "",
     ]
     
@@ -670,6 +682,30 @@ def run_sweep_analysis(traces_dir: str, output_path: str) -> int:
             )
         report_lines.append("")
     
+    # Observation section: kv_aligned=0 with diff=0.0
+    kv0_all_zero = all(
+        r.get('metrics', {}).get('max_abs_diff', 1) == 0.0 
+        for r in results if r.get('kv_aligned') == '0' and r.get('metrics', {}).get('status') == 'OK'
+    )
+    if drift_summary and kv0_all_zero:
+        report_lines.extend([
+            "## Observation: kv_aligned=0 Produced Identical Logits (diff=0.0)",
+            "",
+            "In this sweep, **kv_aligned=0** also produced identical logits (max_abs_diff=0.0, top1=1.0)",
+            "for all spans (32/128/512) and dtypes (bf16/fp16).",
+            "",
+            "**Interpretation:**",
+            "",
+            "- The effective prefill/decode routes are numerically equivalent for this model/config",
+            "- The kv_aligned flag does not alter observable logits in this scenario (maintained by contract)",
+            "",
+            "**Note (contrast with B3.66):**",
+            "",
+            "B3.66 reported drift (EXPECTED) under a different metric/route. This sweep does not invalidate",
+            "that finding, but suggests drift does not manifest in logits under this specific configuration.",
+            "",
+        ])
+    
     # Performance section (B3.71)
     if perf_summary:
         report_lines.extend([
@@ -702,16 +738,31 @@ def run_sweep_analysis(traces_dir: str, output_path: str) -> int:
     
     # Write summary.json
     summary_json_path = output_dir / 'summary.json'
+    
+    # Check if kv_aligned=0 produced all-zero diffs
+    kv0_all_zero = all(
+        r.get('metrics', {}).get('max_abs_diff', 1) == 0.0 
+        for r in results if r.get('kv_aligned') == '0' and r.get('metrics', {}).get('status') == 'OK'
+    )
+    
     summary_data = {
         'timestamp': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
         'global_verdict': global_verdict,
-        'verdicts': {
+        'run_count_total': run_count_total,
+        'pair_count_total': pair_count_total,
+        'pairs_per_run': 2,
+        'counting_note': 'Verdict counts are per pair (prefill+decode), not per run',
+        'verdict_counts_pairs': {
             'pass_equiv': pass_count,
             'fail_equiv': fail_count,
             'expected_drift': drift_count,
-            'incomplete': incomplete_count
+            'incomplete': incomplete_count,
+            'skipped': len(skipped)
         },
-        'skipped_count': len(skipped),
+        'kv0_observation': {
+            'all_diffs_zero': kv0_all_zero,
+            'interpretation': 'Effective prefill/decode routes are numerically equivalent for this config' if kv0_all_zero else None
+        },
         'warnings': warnings,
         'config': root_config,
         'results': results

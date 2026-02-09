@@ -1,13 +1,21 @@
 {
   "timestamp": "2026-02-09T07:12:15.359109Z",
   "global_verdict": "PASS",
-  "verdicts": {
+  "run_count_total": 72,
+  "pair_count_total": 36,
+  "pairs_per_run": 2,
+  "counting_note": "Verdict counts are per pair (prefill+decode), not per run",
+  "verdict_counts_pairs": {
     "pass_equiv": 18,
     "fail_equiv": 0,
     "expected_drift": 18,
-    "incomplete": 0
+    "incomplete": 0,
+    "skipped": 0
   },
-  "skipped_count": 0,
+  "kv0_observation": {
+    "all_diffs_zero": true,
+    "interpretation": "Effective prefill/decode routes are numerically equivalent for this config"
+  },
   "warnings": [],
   "config": {
     "spans": [

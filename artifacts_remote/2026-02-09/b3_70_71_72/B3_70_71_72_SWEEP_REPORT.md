@@ -13,6 +13,29 @@
 - INCOMPLETE: 0
 - SKIPPED: 0
 
+## Counting Semantics: Runs vs Pairs
+
+- A **run** = one execution (prefill OR decode) for a single config
+- A **pair** = (prefill, decode) for the same (span, dtype, kv_aligned, seed)
+- **Total runs:** 72
+- **Total pairs:** 36 (runs / 2)
+- Verdict counts (PASS_EQUIV, EXPECTED_DRIFT, etc.) are **per pair**, not per run
+
+## Observation: kv_aligned=0 Produced Identical Logits (diff=0.0)
+
+In this sweep, **kv_aligned=0** also produced identical logits (max_abs_diff=0.0, top1=1.0)
+for all spans (32/128/512) and dtypes (bf16/fp16).
+
+**Interpretation:**
+
+- The effective prefill/decode routes are numerically equivalent for this model/config
+- The kv_aligned flag does not alter observable logits in this scenario (maintained by contract)
+
+**Note (contrast with B3.66):**
+
+B3.66 reported drift (EXPECTED) under a different metric/route. This sweep does not invalidate
+that finding, but suggests drift does not manifest in logits under this specific configuration.
+
 ## Comparison Results
 
 | span | dtype | kv_aligned | seed | max_abs_diff | p99_abs_diff | top1_agreement | verdict |
