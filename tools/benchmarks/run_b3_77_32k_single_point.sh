@@ -19,7 +19,7 @@ DTYPE="bf16"
 KV_ALIGNED=1
 SEED=0
 BATCH=1
-TIMEOUT_SEC=25 # ~2.5x of B3.76 16k run (~4s per phase)
+TIMEOUT_SEC=60 # Increased to accommodate model load + 32k processing
 OUT_ROOT="artifacts_remote"
 
 REMOTE_BASE="/root/gretacore"
@@ -73,9 +73,9 @@ cat > "$LOCAL_RUNS_DIR/config.json" << EOF
 EOF
 
 # Ensure each mode has its perf.json
-CONTEXT_DIR="$LOCAL_RUNS_DIR/runs/context_${CONTEXT_LEN}/gen_${GEN_LEN}/span_${DUMP_SPAN}/dtype_${DTYPE}/kv_${KV_ALIGNED}/seed_${SEED}/batch_${BATCH}"
+CONTEXT_DIR="$LOCAL_RUNS_DIR/context_${CONTEXT_LEN}/gen_${GEN_LEN}/span_${DUMP_SPAN}/dtype_${DTYPE}/kv_${KV_ALIGNED}/seed_${SEED}/batch_${BATCH}"
 if [ -d "$CONTEXT_DIR" ]; then
-    PEAK=$(cat "$CONTEXT_DIR/vram.json" 2>/dev/null | python3 -c 'import sys, json; print(json.load(sys.stdin).get("peak_vram_mb", 0))' || echo 0)
+    PEAK=$(cat "$CONTEXT_DIR/vram.json" 2>/dev/null | python -c 'import sys, json; print(json.load(sys.stdin).get("peak_vram_mb", 0))' || echo 0)
     for MODE in prefill decode; do
         MODE_DIR="$CONTEXT_DIR/$MODE"
         if [ -d "$MODE_DIR" ]; then
