@@ -1787,9 +1787,148 @@ def run_b3_75_ci_analysis(traces_dir_str: str, output_path: str, baseline_path: 
         'optimization_notes': opt_notes
     }
     with open(Path(output_path).parent / "summary.json", 'w') as f:
+    return 1 if (completeness_verdict == "INCOMPLETE" or stats['fail_equiv'] > 0) else 0
+    
+# -----------------------------------------------------------------------------
+# B3.76 Long-Context & Memory Pressure Analysis (MI300X)
+# -----------------------------------------------------------------------------
+
+def load_b3_76_runs(traces_dir: Path):
+    """Load B3.76 runs including vram.json."""
+    config_path = traces_dir / "config.json"
+    if not config_path.exists():
+        return None, []
+    
+    with open(config_path, 'r') as f:
+        config = json.load(f)
+
+    runs = []
+    # Structure: .../context_N/gen_G/span_S/dtype_D/kv_K/seed_Z/batch_B/mode/perf.json
+    for perf_path in traces_dir.rglob("perf.json"):
+        try:
+            with open(perf_path, 'r') as f:
+                perf = json.load(f)
+            
+            run_dir = perf_path.parent
+            # Attach paths
+            perf['_path'] = str(run_dir)
+            perf['_logits'] = str(run_dir / "logits.jsonl.gz")
+            perf['_metadata'] = str(run_dir / "metadata.json")
+            
+            # vram.json is peer to mode dirs
+            vram_path = run_dir.parent / "vram.json"
+            if vram_path.exists():
+                with open(vram_path, 'r') as f:
+                    perf['vram'] = json.load(f)
+            
+            runs.append(perf)
+        except Exception as e:
+            print(f"[WARN] Failed to load {perf_path}: {e}")
+            
+    return config, runs
+
+def run_b3_76_memory_pressure_analysis(traces_dir_str: str, output_path: str) -> int:
+    traces_dir = Path(traces_dir_str)
+    print(f"[B3.76] Loading runs from: {traces_dir}")
+    
+    config, runs = load_b3_76_runs(traces_dir)
+    if config is None:
+        print(f"[ERROR] No config.json found in {traces_dir}")
+        return 1
+
+    # Check for skips/OOM
+    skips = []
+    for skip_path in traces_dir.rglob("skip.json"):
+        with open(skip_path, 'r') as f:
+            skips.append(json.load(f))
+
+    # Group pairs
+    pairs = defaultdict(dict)
+    for r in runs:
+        # Key by (context, kv) since other params are fixed in B3.76 matrix
+        key = (r['context_len'], r['kv_aligned'])
+        pairs[key][r['mode']] = r
+
+    results = []
+    global_verdict = 'PASS'
+    
+    # Thresholds
+    THRESH_P99 = 1e-3
+    THRESH_MAX = 5e-3
+    THRESH_TOP1 = 0.999
+
+    for key, modes in sorted(pairs.items()):
+        context, kv = key
+        row = {
+            'context': context, 'kv': kv, 'verdict': 'INCOMPLETE',
+            'max_diff': None, 'p99_diff': None, 'top1': None, 'peak_vram': 0
+        }
+        
+        if 'prefill' in modes and 'decode' in modes:
+            p_run = modes['prefill']
+            d_run = modes['decode']
+            
+            row['peak_vram'] = p_run.get('vram', {}).get('peak_vram_mb', 0)
+            
+            if p_run['_logits'] and d_run['_logits'] and os.path.exists(p_run['_logits']) and os.path.exists(d_run['_logits']):
+                metrics = compute_logits_diff(p_run['_logits'], d_run['_logits'])
+                if metrics.get('status') == 'OK':
+                    row['max_diff'] = metrics['max_abs_diff']
+                    row['p99_diff'] = metrics['p99_abs_diff']
+                    row['top1'] = metrics['top1_agreement']
+                    
+                    if kv == 1:
+                        if (row['p99_diff'] <= THRESH_P99 and row['max_diff'] <= THRESH_MAX and row['top1'] >= THRESH_TOP1):
+                            row['verdict'] = 'PASS_EQUIV'
+                        else:
+                            row['verdict'] = 'FAIL_EQUIV'
+                            global_verdict = 'FAIL'
+                    else:
+                        row['verdict'] = 'EXPECTED_DRIFT'
+                else:
+                    row['verdict'] = 'ERROR_LOGITS'
+                    global_verdict = 'FAIL'
+            else:
+                row['verdict'] = 'MISSING_LOGITS'
+                global_verdict = 'FAIL'
+        
+        results.append(row)
+
+    if skips:
+        global_verdict = 'FAIL_OOM' if any(s.get('status') == 'SKIPPED_DUE_TO_OOM' for s in skips) else global_verdict
+
+    # Report
+    with open(output_path, 'w') as f:
+        f.write("# B3.76 Long-Context & Memory Pressure Report\n\n")
+        f.write(f"**Global Verdict:** {global_verdict}\n\n")
+        
+        f.write("## Context Matrix & VRAM\n\n")
+        f.write("| Context | KV | Peak VRAM (MB) | Max Diff | P99 Diff | Top1 | Verdict |\n")
+        f.write("|---|---|---|---|---|---|---|\n")
+        for r in results:
+            max_d = f"{r['max_diff']:.6f}" if r['max_diff'] is not None else "N/A"
+            p99_d = f"{r['p99_diff']:.6f}" if r['p99_diff'] is not None else "N/A"
+            top1 = f"{r['top1']:.4f}" if r['top1'] is not None else "N/A"
+            f.write(f"| {r['context']} | {r['kv']} | {r['peak_vram']} | {max_d} | {p99_d} | {top1} | {r['verdict']} |\n")
+        
+        if skips:
+            f.write("\n## Skips/Failures\n\n")
+            for s in skips:
+                f.write(f"- {s.get('status')}\n")
+
+    print(f"Report written to: {output_path}")
+    
+    # JSON Summary
+    summary = {
+        'ticket': 'B3.76',
+        'global_verdict': global_verdict,
+        'results': results,
+        'skips': skips
+    }
+    with open(Path(output_path).parent / "summary.json", 'w') as f:
         json.dump(summary, f, indent=2)
 
-    return 1 if (completeness_verdict == "INCOMPLETE" or stats['fail_equiv'] > 0) else 0
+    return 1 if global_verdict != 'PASS' else 0
 
 def main():
     parser = argparse.ArgumentParser(description='B3.67 Equivalence Guardrail Analyzer')
@@ -1805,8 +1944,8 @@ def main():
                         help='Expected seeds (comma-separated)')
     parser.add_argument('--kv-aligned', type=str, default='0,1',
                         help='Expected kv_aligned values (comma-separated)')
-    parser.add_argument('--mode', type=str, default='b3_67', choices=['b3_67', 'b3_69', 'b3_70_71_72', 'b3_73', 'b3_74', 'b3_75'],
-                        help='Analysis mode: b3_67 (metadata), b3_69 (logits), b3_70+ (sweep), b3_73 (reconcile), b3_74 (internal), b3_75 (CI)')
+    parser.add_argument('--mode', type=str, default='b3_67', choices=['b3_67', 'b3_69', 'b3_70_71_72', 'b3_73', 'b3_74', 'b3_75', 'b3_76'],
+                        help='Analysis mode: b3_67 (metadata), b3_69 (logits), b3_70+ (sweep), b3_73 (reconcile), b3_74 (internal), b3_75 (CI), b3_76 (pressure)')
     
     args = parser.parse_args()
     
@@ -1820,6 +1959,10 @@ def main():
     # B3.75 CI mode
     if args.mode == 'b3_75':
         return run_b3_75_ci_analysis(args.traces_dir, args.output)
+
+    # B3.76 Pressure mode
+    if args.mode == 'b3_76':
+        return run_b3_76_memory_pressure_analysis(args.traces_dir, args.output)
 
     # B3.73 reconciliation mode: use dedicated analysis path
     if args.mode == 'b3_73':
