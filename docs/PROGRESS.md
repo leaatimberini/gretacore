@@ -12,6 +12,7 @@
 **B3.70**: COMPLETED - Drift characterization (PASS; diff=0.0, top1=1.0)
 **B3.71**: COMPLETED - Span escalation (PASS; 32→40s, 128→56s, 512→117s)
 **B3.72**: COMPLETED - Cross-dtype sweep bf16/fp16 (PASS; max_diff=0.0)
+**B3.73**: IN_PROGRESS - Reconcile B3.66 vs B3.69 (pending MI300X execution)
 
 ---
 
@@ -27,6 +28,7 @@
 **B3.70**: COMPLETED - Drift characterization (PASS; diff=0.0, top1=1.0)
 **B3.71**: COMPLETED - Span escalation (PASS; 32→40s, 128→56s, 512→117s)
 **B3.72**: COMPLETED - Cross-dtype sweep bf16/fp16 (PASS; max_diff=0.0)
+**B3.73**: IN_PROGRESS - Reconcile B3.66 vs B3.69 (pending MI300X execution)
 
 ---
 
@@ -63,6 +65,7 @@
 | B3.70 | 2026-02-09 | Drift Characterization (kv=0) | COMPLETED | PASS (diff=0.0, top1=1.0) | N/A (no gate, metrics only) | artifacts_remote/2026-02-09/b3_70_71_72/ | docs/AMD/2026_02_09_B3_70_71_72_sweep.md |
 | B3.71 | 2026-02-09 | Span Escalation + Perf | COMPLETED | PASS (32→40s, 128→56s, 512→117s) | N/A (profiling) | artifacts_remote/2026-02-09/b3_70_71_72/ | docs/AMD/2026_02_09_B3_70_71_72_sweep.md |
 | B3.72 | 2026-02-09 | Cross-Dtype Sweep | COMPLETED | PASS (bf16=fp16; max_diff=0.0) | N/A (dtype gate kv=1) | artifacts_remote/2026-02-09/b3_70_71_72/ | docs/AMD/2026_02_09_B3_70_71_72_sweep.md |
+| B3.73 | 2026-02-09 | Reconcile B3.66 vs B3.69 | IN_PROGRESS | PENDING | TBD | artifacts_remote/2026-02-09/b3_73/ | docs/AMD/2026_02_09_B3_73_reconcile_b3_66_vs_b3_69.md |
 
 ---
 
