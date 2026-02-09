@@ -24,7 +24,7 @@
 
 ---
 
-## Sync Status (2026-02-07)
+## Sync Status (2026-02-09)
 
 **Repo branch**: `main` (tracked via origin/main)
 
@@ -32,7 +32,9 @@
 - B3.63 D2H audit: `de3b888`
 - B3.66 base mode: `56b755a`
 - B3.66 v2 mode: `77fd6bd`
-- B3.67 guardrail: IMPLEMENTED + LOCAL_SMOKE_PASS (pending MI300X full matrix + greta_infer kv_aligned)
+- B3.67 guardrail closeout (MI300X): `68b32be` (runner fix: `83770d8`; runner dump-logits: `d47c8f3`)
+- B3.68 greta_infer kv_aligned + logits dump: `4a57383`
+- B3.69 logits-diff gate: `e7418b2` (zlib linkage fix: `ee65f79`; docs: `e1f36ba`)
 - Docs index: `1f662f1`
 
 **Nota / Note**:
@@ -51,7 +53,7 @@
 | B3.66 | 2026-02-07 | Prefill vs Decode Drift Probe | COMPLETED | FAIL (expected) | ATTENTION_COMPUTATION_MISMATCH | artifacts_remote/2026-02-07/b3_66/ | docs/AMD/2026_02_07_B3_66_prefill_decode_drift_probe.md |
 | B3.66 v2 | 2026-02-07 | kv_aligned Mode | COMPLETED | EXPECTED (kv_aligned evidence added) | STRUCTURAL_DRIFT (EXPECTED; prefill vs decode semantics) | artifacts_remote/2026-02-07/b3_66_v2/ | docs/AMD/2026_02_07_B3_66_v2_kv_aligned_probe.md |
 | B3.67 | 2026-02-08 | Equivalence Guardrail | COMPLETED | PASS_GUARDRAIL (MI300X full matrix; PASS_EQUIV_METADATA) | N/A (automation/guardrail) | artifacts_remote/2026-02-08/b3_67/ | docs/AMD/2026_02_07_B3_67_equivalence_guardrail.md |
-| B3.69 | 2026-02-08 | Logits-Diff Equivalence Gate | COMPLETED | PASS_GUARDRAIL (diff=0.0, top1=1.0) | N/A (real numeric comparison) | artifacts_remote/2026-02-09/b3_69/ | docs/AMD/2026_02_08_B3_69_logits_diff_equivalence_gate.md |
+| B3.69 | 2026-02-09 | Logits-Diff Equivalence Gate | COMPLETED | PASS_GUARDRAIL (diff=0.0, top1=1.0) | N/A (real numeric comparison) | artifacts_remote/2026-02-09/b3_69/ | docs/AMD/2026_02_08_B3_69_logits_diff_equivalence_gate.md |
 
 ---
 
