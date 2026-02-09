@@ -1,0 +1,10 @@
+{
+  "kv_aligned": [0, 1],
+  "seeds": [0],
+  "dtype": "bf16",
+  "gen_len": 1,
+  "mode": ["prefill", "decode"],
+  "description": "B3.67 1-step equivalence guardrail matrix",
+  "timestamp": "2026-02-08T02:49:55Z",
+  "git_commit": "4a57383"
+}

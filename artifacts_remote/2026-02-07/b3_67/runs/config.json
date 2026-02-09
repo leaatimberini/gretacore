@@ -1,0 +1,13 @@
+{
+    "kv_aligned": [
+        "0",
+        "1"
+    ],
+    "seeds": [
+        "0",
+        "1",
+        "2"
+    ],
+    "layer": 32,
+    "description": "B3.67 Equivalence Guardrail expected configurations"
+}

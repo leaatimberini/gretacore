@@ -1118,6 +1118,8 @@ Generator::generate_tokens(const std::vector<int32_t> &prompt_tokens,
       step.topk_ids.push_back(top[i].second);
       step.topk_logits.push_back(top[i].first);
     }
+    // B3.69: Copy full logits for equivalence comparison
+    step.full_logits = logits_host;
     align_callback(step);
   }
 
@@ -1447,6 +1449,8 @@ Generator::generate_tokens(const std::vector<int32_t> &prompt_tokens,
           step.topk_ids.push_back(top[k].second);
           step.topk_logits.push_back(top[k].first);
         }
+        // B3.69: Copy full logits for equivalence comparison
+        step.full_logits = logits_host;
         align_callback(step);
       }
     }

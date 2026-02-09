@@ -1,0 +1,97 @@
+{
+  "timestamp": "2026-02-08T03:40:40.297082Z",
+  "config_present": true,
+  "expected_pairs": 6,
+  "found_pairs": 6,
+  "missing_pairs_count": 0,
+  "missing_pairs": [],
+  "completeness_status": "COMPLETE",
+  "verdicts": {
+    "pass_equiv": 3,
+    "fail_equiv": 0,
+    "expected_drift": 3,
+    "inconclusive": 0
+  },
+  "global_verdict": "PASS_GUARDRAIL",
+  "layer_analyzed": 32,
+  "results": [
+    {
+      "kv_aligned": "0",
+      "seed": "0",
+      "verdict": "EXPECTED_DRIFT",
+      "metrics": {
+        "max_abs_diff": null,
+        "p99_abs_diff": null,
+        "top1_agreement": null,
+        "cos_sim_mean": null,
+        "status": "METADATA_ONLY"
+      },
+      "pairing_errors": []
+    },
+    {
+      "kv_aligned": "0",
+      "seed": "1",
+      "verdict": "EXPECTED_DRIFT",
+      "metrics": {
+        "max_abs_diff": null,
+        "p99_abs_diff": null,
+        "top1_agreement": null,
+        "cos_sim_mean": null,
+        "status": "METADATA_ONLY"
+      },
+      "pairing_errors": []
+    },
+    {
+      "kv_aligned": "0",
+      "seed": "2",
+      "verdict": "EXPECTED_DRIFT",
+      "metrics": {
+        "max_abs_diff": null,
+        "p99_abs_diff": null,
+        "top1_agreement": null,
+        "cos_sim_mean": null,
+        "status": "METADATA_ONLY"
+      },
+      "pairing_errors": []
+    },
+    {
+      "kv_aligned": "1",
+      "seed": "0",
+      "verdict": "PASS_EQUIV_METADATA",
+      "metrics": {
+        "max_abs_diff": null,
+        "p99_abs_diff": null,
+        "top1_agreement": null,
+        "cos_sim_mean": null,
+        "status": "METADATA_ONLY"
+      },
+      "pairing_errors": []
+    },
+    {
+      "kv_aligned": "1",
+      "seed": "1",
+      "verdict": "PASS_EQUIV_METADATA",
+      "metrics": {
+        "max_abs_diff": null,
+        "p99_abs_diff": null,
+        "top1_agreement": null,
+        "cos_sim_mean": null,
+        "status": "METADATA_ONLY"
+      },
+      "pairing_errors": []
+    },
+    {
+      "kv_aligned": "1",
+      "seed": "2",
+      "verdict": "PASS_EQUIV_METADATA",
+      "metrics": {
+        "max_abs_diff": null,
+        "p99_abs_diff": null,
+        "top1_agreement": null,
+        "cos_sim_mean": null,
+        "status": "METADATA_ONLY"
+      },
+      "pairing_errors": []
+    }
+  ]
+}

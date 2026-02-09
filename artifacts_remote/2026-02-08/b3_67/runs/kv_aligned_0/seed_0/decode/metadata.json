@@ -1,0 +1,11 @@
+{
+  "dtype": "bf16",
+  "prompt_len": 38,
+  "gen_len": 1,
+  "seed": 0,
+  "kv_aligned": 0,
+  "mode": "decode",
+  "token_span": {"start": 38, "count": 1},
+  "timestamp": "2026-02-08T03:32:24Z",
+  "repo_branch": "main"
+}

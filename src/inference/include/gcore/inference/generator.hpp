@@ -43,6 +43,9 @@ struct AlignmentStep {
   float logit_mean;
   uint32_t nan_count;
   uint32_t inf_count;
+  // B3.69: Full logits for equivalence comparison (optional, set when
+  // requested)
+  std::vector<float> full_logits;
 };
 
 /// Callback for streaming tokens during generation.

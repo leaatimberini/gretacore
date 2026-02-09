@@ -1,0 +1,97 @@
+{
+  "timestamp": "2026-02-08T01:16:43.209744Z",
+  "config_present": false,
+  "expected_pairs": 6,
+  "found_pairs": 6,
+  "missing_pairs_count": 0,
+  "missing_pairs": [],
+  "completeness_status": "COMPLETE",
+  "verdicts": {
+    "pass_equiv": 0,
+    "fail_equiv": 0,
+    "expected_drift": 0,
+    "inconclusive": 6
+  },
+  "global_verdict": "PASS_GUARDRAIL_LOCAL",
+  "layer_analyzed": 32,
+  "results": [
+    {
+      "kv_aligned": "0",
+      "seed": "0",
+      "verdict": "INCONCLUSIVE",
+      "metrics": {
+        "max_abs_diff": null,
+        "p99_abs_diff": null,
+        "top1_agreement": null,
+        "cos_sim_mean": null,
+        "status": "MISSING_DATA"
+      },
+      "pairing_errors": []
+    },
+    {
+      "kv_aligned": "0",
+      "seed": "1",
+      "verdict": "INCONCLUSIVE",
+      "metrics": {
+        "max_abs_diff": null,
+        "p99_abs_diff": null,
+        "top1_agreement": null,
+        "cos_sim_mean": null,
+        "status": "MISSING_DATA"
+      },
+      "pairing_errors": []
+    },
+    {
+      "kv_aligned": "0",
+      "seed": "2",
+      "verdict": "INCONCLUSIVE",
+      "metrics": {
+        "max_abs_diff": null,
+        "p99_abs_diff": null,
+        "top1_agreement": null,
+        "cos_sim_mean": null,
+        "status": "MISSING_DATA"
+      },
+      "pairing_errors": []
+    },
+    {
+      "kv_aligned": "1",
+      "seed": "0",
+      "verdict": "INCONCLUSIVE",
+      "metrics": {
+        "max_abs_diff": null,
+        "p99_abs_diff": null,
+        "top1_agreement": null,
+        "cos_sim_mean": null,
+        "status": "MISSING_DATA"
+      },
+      "pairing_errors": []
+    },
+    {
+      "kv_aligned": "1",
+      "seed": "1",
+      "verdict": "INCONCLUSIVE",
+      "metrics": {
+        "max_abs_diff": null,
+        "p99_abs_diff": null,
+        "top1_agreement": null,
+        "cos_sim_mean": null,
+        "status": "MISSING_DATA"
+      },
+      "pairing_errors": []
+    },
+    {
+      "kv_aligned": "1",
+      "seed": "2",
+      "verdict": "INCONCLUSIVE",
+      "metrics": {
+        "max_abs_diff": null,
+        "p99_abs_diff": null,
+        "top1_agreement": null,
+        "cos_sim_mean": null,
+        "status": "MISSING_DATA"
+      },
+      "pairing_errors": []
+    }
+  ]
+}

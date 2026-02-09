@@ -14,6 +14,7 @@
 #include <sstream>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <zlib.h>
 
 void print_usage() {
   std::cout
@@ -33,6 +34,7 @@ void print_usage() {
       << "  --mode <prefill|decode> Execution mode for tracing\n"
       << "  --dump-logits <dir> Dump logits to directory (JSONL.gz + "
          "metadata.json)\n"
+      << "  --dump-logits-span <n> Number of tokens to dump (default: 1)\n"
       << "  --demo-tokenizer    Force fallback ASCII tokenizer\n"
       << "  --help              Show this help\n";
 }
@@ -61,7 +63,8 @@ int main(int argc, char *argv[]) {
   int kv_aligned = -1;   // -1 = not set, read from env
   std::string exec_mode; // prefill or decode
   std::string dump_logits_dir;
-  int seed = -1; // -1 = not set, read from env
+  int dump_logits_span = 1; // B3.69: number of tokens to dump
+  int seed = -1;            // -1 = not set, read from env
 
   // Parse arguments
   for (int i = 1; i < argc; ++i) {
@@ -98,6 +101,8 @@ int main(int argc, char *argv[]) {
       exec_mode = argv[++i];
     } else if (strcmp(argv[i], "--dump-logits") == 0 && i + 1 < argc) {
       dump_logits_dir = argv[++i];
+    } else if (strcmp(argv[i], "--dump-logits-span") == 0 && i + 1 < argc) {
+      dump_logits_span = std::atoi(argv[++i]);
     } else if (strcmp(argv[i], "--help") == 0) {
       print_usage();
       return 0;
@@ -135,6 +140,9 @@ int main(int argc, char *argv[]) {
   }
   if (!dump_logits_dir.empty()) {
     std::cout << "  Dump Logits: " << dump_logits_dir << "\n";
+    std::cout << "  Dump Span: " << dump_logits_span << "\n";
+    // B3.69: Override max_tokens to match dump span
+    params.max_tokens = dump_logits_span;
   }
 
   const char *verbose_info = std::getenv("GRETA_VERBOSE_INFO");
@@ -362,8 +370,26 @@ int main(int argc, char *argv[]) {
   std::cout << "═══════════════════════════════════════════════════════════\n";
   std::cout << "Generating...\n\n";
 
+  // B3.69: Captured logits for dump
+  struct CapturedLogit {
+    uint32_t step;
+    int32_t token_id;
+    std::vector<float> logits;
+  };
+  std::vector<CapturedLogit> captured_logits;
+
   gcore::inference::AlignmentCallback align_cb = nullptr;
-  if (enable_alignment) {
+
+  // B3.69: If dumping logits, capture them via alignment callback
+  if (!dump_logits_dir.empty()) {
+    align_cb = [&captured_logits](const gcore::inference::AlignmentStep &step) {
+      CapturedLogit entry;
+      entry.step = step.step;
+      entry.token_id = step.token_id;
+      entry.logits = step.full_logits; // Captured from generator
+      captured_logits.push_back(std::move(entry));
+    };
+  } else if (enable_alignment) {
     align_cb = [](const gcore::inference::AlignmentStep &step) {
       std::cout << "[ALIGNMENT_STEP] {\"step\":" << step.step
                 << ",\"token_id\":" << step.token_id
@@ -426,39 +452,45 @@ int main(int argc, char *argv[]) {
                << ",\n";
       meta_out << "  \"mode\": \"" << (exec_mode.empty() ? "decode" : exec_mode)
                << "\",\n";
-      // token_span: which tokens are dumped (for B3.67 comparison)
-      // For equivalence comparison, both prefill and decode must dump the SAME
-      // span We use the first generated token position (prompt_len) with
-      // count=1 This allows B3.67 analyzer to compare token_idx/token_id/logits
-      // directly
+      // token_span: which tokens are dumped (for B3.67/B3.69 comparison)
+      // B3.69: Use dump_logits_span for count instead of hardcoded 1
       meta_out << "  \"token_span\": {\"start\": " << stats.prompt_tokens
-               << ", \"count\": 1},\n";
+               << ", \"count\": " << dump_logits_span << "},\n";
       meta_out << "  \"timestamp\": \"" << ts_stream.str() << "\",\n";
       meta_out << "  \"repo_branch\": \"main\"\n";
       meta_out << "}\n";
       meta_out.close();
-      std::cout << "[B3.68] Wrote metadata to: " << metadata_path << "\n";
+      std::cout << "[B3.69] Wrote metadata to: " << metadata_path << "\n";
     } else {
-      std::cerr << "[B3.68] ERROR: Could not write " << metadata_path << "\n";
+      std::cerr << "[B3.69] ERROR: Could not write " << metadata_path << "\n";
     }
 
-    // Write empty logits.jsonl.gz (placeholder - actual logit dumping requires
-    // generator integration)
+    // B3.69: Write real logits.jsonl.gz using captured_logits (zlib)
     std::string logits_path = dump_logits_dir + "/logits.jsonl.gz";
-    // Note: Full logits dump requires hooking into generator.generate()
-    // callback This is a stub that creates an empty gzip file to satisfy the
-    // contract
-    FILE *gz = fopen(logits_path.c_str(), "wb");
+    gzFile gz = gzopen(logits_path.c_str(), "wb");
     if (gz) {
-      // Minimal gzip empty file (10 bytes header + 8 bytes trailer)
-      unsigned char empty_gz[] = {0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00,
-                                  0x00, 0x00, 0x03, 0x03, 0x00, 0x00, 0x00,
-                                  0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-      fwrite(empty_gz, 1, sizeof(empty_gz), gz);
-      fclose(gz);
-      std::cout << "[B3.68] Wrote logits stub to: " << logits_path << "\n";
-      std::cout << "[B3.68] NOTE: Full logits collection requires generator "
-                   "callback integration\n";
+      size_t prompt_len = stats.prompt_tokens;
+      for (size_t i = 0; i < captured_logits.size(); ++i) {
+        const auto &entry = captured_logits[i];
+        // Format: {"token_idx": <absolute>, "token_id": <int>, "logits":
+        // [<floats>]}
+        std::ostringstream line;
+        line << "{\"token_idx\":" << (prompt_len + i)
+             << ",\"token_id\":" << entry.token_id << ",\"logits\":[";
+        for (size_t j = 0; j < entry.logits.size(); ++j) {
+          if (j > 0)
+            line << ",";
+          line << std::setprecision(8) << entry.logits[j];
+        }
+        line << "]}\n";
+        std::string s = line.str();
+        gzwrite(gz, s.c_str(), s.size());
+      }
+      gzclose(gz);
+      std::cout << "[B3.69] Wrote logits (" << captured_logits.size()
+                << " entries) to: " << logits_path << "\n";
+    } else {
+      std::cerr << "[B3.69] ERROR: Could not write " << logits_path << "\n";
     }
   }
 

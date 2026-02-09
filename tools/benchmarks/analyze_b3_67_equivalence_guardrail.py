@@ -109,7 +109,8 @@ def load_traces(traces_dir: str) -> dict:
                 traces[kv_aligned][seed][mode] = {
                     'config': config,
                     'metadata': metadata,  # B3.68 specific
-                    'entries': trace_entries
+                    'entries': trace_entries,
+                    'logits_path': str(logits_path) if logits_path.exists() else None  # B3.69
                 }
     
     return traces
@@ -222,6 +223,83 @@ def compute_comparison_metrics(prefill_states: list, decode_states: list) -> dic
         metrics = {'status': 'NO_MATCHING_DATA'}
     
     return metrics
+
+
+def compute_logits_diff(prefill_logits_path: str, decode_logits_path: str) -> dict:
+    """Compare logits between prefill and decode from real logits.jsonl.gz files.
+    
+    For B3.69: Real numeric comparison of full logits arrays.
+    Returns: max_abs_diff, p99_abs_diff, top1_agreement, status
+    """
+    def load_logits_file(path: str) -> list:
+        """Load logits entries from gzipped JSONL file."""
+        entries = []
+        try:
+            with gzip.open(path, 'rt', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if line:
+                        entries.append(json.loads(line))
+        except Exception as e:
+            print(f"  Warning: Could not load logits from {path}: {e}")
+        return entries
+    
+    # Load logits from both files
+    prefill_entries = load_logits_file(prefill_logits_path)
+    decode_entries = load_logits_file(decode_logits_path)
+    
+    if not prefill_entries or not decode_entries:
+        return {'status': 'MISSING_LOGITS', 'prefill_count': len(prefill_entries), 
+                'decode_count': len(decode_entries)}
+    
+    if len(prefill_entries) != len(decode_entries):
+        return {'status': 'COUNT_MISMATCH', 'prefill_count': len(prefill_entries),
+                'decode_count': len(decode_entries)}
+    
+    # Compare logits entry-by-entry
+    all_diffs = []
+    max_diffs = []
+    top1_matches = 0
+    total = 0
+    
+    for pf, dc in zip(prefill_entries, decode_entries):
+        pf_logits = pf.get('logits', [])
+        dc_logits = dc.get('logits', [])
+        
+        if not pf_logits or not dc_logits:
+            continue
+        
+        if len(pf_logits) != len(dc_logits):
+            continue
+        
+        total += 1
+        
+        # Compute differences
+        diffs = [abs(p - d) for p, d in zip(pf_logits, dc_logits)]
+        all_diffs.extend(diffs)
+        max_diffs.append(max(diffs))
+        
+        # Top-1 agreement (argmax matching)
+        pf_top1 = pf_logits.index(max(pf_logits))
+        dc_top1 = dc_logits.index(max(dc_logits))
+        if pf_top1 == dc_top1:
+            top1_matches += 1
+    
+    if total == 0:
+        return {'status': 'NO_VALID_ENTRIES'}
+    
+    # Compute metrics
+    sorted_diffs = sorted(all_diffs)
+    p99_idx = int(len(sorted_diffs) * 0.99) - 1
+    p99_idx = max(0, min(p99_idx, len(sorted_diffs) - 1))
+    
+    return {
+        'max_abs_diff': max(max_diffs) if max_diffs else None,
+        'p99_abs_diff': sorted_diffs[p99_idx] if sorted_diffs else None,
+        'top1_agreement': top1_matches / total if total > 0 else None,
+        'entries_compared': total,
+        'status': 'OK'
+    }
 
 
 def validate_pairing(prefill_entries: list, decode_entries: list) -> dict:
@@ -457,6 +535,8 @@ def main():
                         help='Expected seeds (comma-separated)')
     parser.add_argument('--kv-aligned', type=str, default='0,1',
                         help='Expected kv_aligned values (comma-separated)')
+    parser.add_argument('--mode', type=str, default='b3_67', choices=['b3_67', 'b3_69'],
+                        help='Analysis mode: b3_67 (metadata-only) or b3_69 (real logits-diff)')
     
     args = parser.parse_args()
     
@@ -525,13 +605,29 @@ def main():
                 pairing['errors'].append(span_validation['error'])
                 pairing['is_valid'] = False
             
-            # Compute metrics - check if we have actual hidden states
+            # Compute metrics - check which mode we're in
             if prefill_states and decode_states:
                 # Legacy B3.66 path: compare hidden states
                 metrics = compute_comparison_metrics(prefill_states, decode_states)
                 verdict = compute_verdict(metrics, int(kv_aligned))
+            elif args.mode == 'b3_69' and prefill_metadata and decode_metadata:
+                # B3.69 path: Real logits-diff comparison
+                prefill_logits_path = prefill_data.get('logits_path')
+                decode_logits_path = decode_data.get('logits_path')
+                
+                if prefill_logits_path and decode_logits_path:
+                    metrics = compute_logits_diff(prefill_logits_path, decode_logits_path)
+                    if metrics.get('status') == 'OK':
+                        verdict = compute_verdict(metrics, int(kv_aligned))
+                    else:
+                        # Missing or invalid logits in b3_69 mode = INCONCLUSIVE
+                        verdict = 'INCONCLUSIVE'
+                else:
+                    # No logits files in b3_69 mode = INCONCLUSIVE
+                    metrics = {'status': 'MISSING_LOGITS_PATH'}
+                    verdict = 'INCONCLUSIVE'
             elif prefill_metadata and decode_metadata:
-                # B3.68 path: metadata-only validation
+                # B3.68 path (b3_67 mode): metadata-only validation
                 # With stub logits, we can only verify structural consistency
                 if span_validation['is_valid']:
                     metrics = {
