@@ -1,0 +1,9 @@
+{
+    "platform": "MI300X",
+    "baseline_date": "2026-02-09",
+    "tolerances": {
+        "warn_pct": 15,
+        "fail_pct": 30
+    },
+    "cells": []
+}
