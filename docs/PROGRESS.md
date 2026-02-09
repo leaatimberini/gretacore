@@ -9,6 +9,9 @@
 **B3.66 v2**: COMPLETED - kv_aligned mode probe
 **B3.67**: COMPLETED - Equivalence guardrail (prefill vs decode) (PASS_GUARDRAIL; MI300X full matrix; metadata-only equiv)
 **B3.69**: COMPLETED - Logits-diff equivalence gate (PASS_GUARDRAIL; max_abs_diff=0.0, top1_agreement=1.0)
+**B3.70**: IN_PROGRESS - Drift characterization (kv_aligned=0; no gate, metrics only)
+**B3.71**: IN_PROGRESS - Span escalation + cost profiling (32/128/512)
+**B3.72**: IN_PROGRESS - Cross-dtype sweep (bf16/fp16/fp8)
 
 ---
 
@@ -21,6 +24,9 @@
 **B3.66 v2**: COMPLETED - kv_aligned mode probe
 **B3.67**: COMPLETED - Equivalence guardrail (prefill vs decode) (PASS_GUARDRAIL; MI300X full matrix; metadata-only equiv)
 **B3.69**: COMPLETED - Logits-diff equivalence gate (PASS_GUARDRAIL; max_abs_diff=0.0, top1_agreement=1.0)
+**B3.70**: IN_PROGRESS - Drift characterization (kv_aligned=0; no gate, metrics only)
+**B3.71**: IN_PROGRESS - Span escalation + cost profiling (32/128/512)
+**B3.72**: IN_PROGRESS - Cross-dtype sweep (bf16/fp16/fp8)
 
 ---
 
@@ -54,6 +60,9 @@
 | B3.66 v2 | 2026-02-07 | kv_aligned Mode | COMPLETED | EXPECTED (kv_aligned evidence added) | STRUCTURAL_DRIFT (EXPECTED; prefill vs decode semantics) | artifacts_remote/2026-02-07/b3_66_v2/ | docs/AMD/2026_02_07_B3_66_v2_kv_aligned_probe.md |
 | B3.67 | 2026-02-08 | Equivalence Guardrail | COMPLETED | PASS_GUARDRAIL (MI300X full matrix; PASS_EQUIV_METADATA) | N/A (automation/guardrail) | artifacts_remote/2026-02-08/b3_67/ | docs/AMD/2026_02_07_B3_67_equivalence_guardrail.md |
 | B3.69 | 2026-02-09 | Logits-Diff Equivalence Gate | COMPLETED | PASS_GUARDRAIL (diff=0.0, top1=1.0) | N/A (real numeric comparison) | artifacts_remote/2026-02-09/b3_69/ | docs/AMD/2026_02_08_B3_69_logits_diff_equivalence_gate.md |
+| B3.70 | 2026-02-09 | Drift Characterization (kv=0) | IN_PROGRESS | pending | N/A (no gate, metrics only) | artifacts_remote/2026-02-09/b3_70_71_72/ | docs/AMD/2026_02_09_B3_70_71_72_sweep.md |
+| B3.71 | 2026-02-09 | Span Escalation + Perf | IN_PROGRESS | pending | N/A (profiling) | artifacts_remote/2026-02-09/b3_70_71_72/ | docs/AMD/2026_02_09_B3_70_71_72_sweep.md |
+| B3.72 | 2026-02-09 | Cross-Dtype Sweep | IN_PROGRESS | pending | N/A (dtype gate kv=1) | artifacts_remote/2026-02-09/b3_70_71_72/ | docs/AMD/2026_02_09_B3_70_71_72_sweep.md |
 
 ---
 

@@ -302,6 +302,443 @@ def compute_logits_diff(prefill_logits_path: str, decode_logits_path: str) -> di
     }
 
 
+# =============================================================================
+# B3.70-71-72 Sweep Mode Functions
+# =============================================================================
+
+def load_traces_sweep(traces_dir: str) -> dict:
+    """Load traces from B3.70-71-72 sweep directory structure.
+    
+    Structure: span_<N>/dtype_<dtype>/kv_aligned_<kv>/seed_<s>/<mode>/
+    Returns dict keyed by (span, dtype, kv_aligned, seed, mode)
+    """
+    traces_dir = Path(traces_dir)
+    traces = {}
+    
+    for span_dir in traces_dir.iterdir():
+        if not span_dir.is_dir() or not span_dir.name.startswith('span_'):
+            continue
+        span = span_dir.name.replace('span_', '')
+        
+        for dtype_dir in span_dir.iterdir():
+            if not dtype_dir.is_dir() or not dtype_dir.name.startswith('dtype_'):
+                continue
+            dtype = dtype_dir.name.replace('dtype_', '')
+            
+            for kv_dir in dtype_dir.iterdir():
+                if not kv_dir.is_dir() or not kv_dir.name.startswith('kv_aligned_'):
+                    continue
+                kv_aligned = kv_dir.name.replace('kv_aligned_', '')
+                
+                for seed_dir in kv_dir.iterdir():
+                    if not seed_dir.is_dir() or not seed_dir.name.startswith('seed_'):
+                        continue
+                    seed = seed_dir.name.replace('seed_', '')
+                    
+                    for mode_dir in seed_dir.iterdir():
+                        if not mode_dir.is_dir() or mode_dir.name not in ['prefill', 'decode']:
+                            continue
+                        mode = mode_dir.name
+                        
+                        key = (span, dtype, kv_aligned, seed, mode)
+                        
+                        # Check for skip marker
+                        skip_path = mode_dir / 'skip.json'
+                        if skip_path.exists():
+                            with open(skip_path) as f:
+                                traces[key] = {'status': 'SKIPPED', 'skip_info': json.load(f)}
+                            continue
+                        
+                        # Load metadata and logits path
+                        metadata_path = mode_dir / 'metadata.json'
+                        logits_path = mode_dir / 'logits.jsonl.gz'
+                        perf_path = mode_dir / 'perf.json'
+                        
+                        data = {
+                            'span': span,
+                            'dtype': dtype,
+                            'kv_aligned': kv_aligned,
+                            'seed': seed,
+                            'mode': mode,
+                            'metadata': None,
+                            'logits_path': str(logits_path) if logits_path.exists() else None,
+                            'perf': None,
+                            'status': 'OK'
+                        }
+                        
+                        if metadata_path.exists():
+                            with open(metadata_path) as f:
+                                data['metadata'] = json.load(f)
+                        
+                        if perf_path.exists():
+                            with open(perf_path) as f:
+                                data['perf'] = json.load(f)
+                        
+                        if not logits_path.exists():
+                            data['status'] = 'MISSING_LOGITS'
+                        
+                        traces[key] = data
+    
+    return traces
+
+
+def aggregate_drift_summary(results: list) -> dict:
+    """Aggregate drift metrics for kv_aligned=0 (B3.70).
+    
+    Returns by (span, dtype): max, mean, p95 of max_abs_diff, p99_abs_diff, top1_agreement
+    """
+    drift_data = defaultdict(list)
+    
+    for r in results:
+        if r.get('kv_aligned') != '0':
+            continue
+        metrics = r.get('metrics', {})
+        if metrics.get('status') != 'OK':
+            continue
+        
+        key = (r.get('span', 'N/A'), r.get('dtype', 'N/A'))
+        drift_data[key].append({
+            'max_abs_diff': metrics.get('max_abs_diff', 0),
+            'p99_abs_diff': metrics.get('p99_abs_diff', 0),
+            'top1_agreement': metrics.get('top1_agreement', 1.0)
+        })
+    
+    summary = {}
+    for key, entries in drift_data.items():
+        if not entries:
+            continue
+        
+        max_diffs = [e['max_abs_diff'] for e in entries]
+        p99_diffs = [e['p99_abs_diff'] for e in entries]
+        top1_vals = [e['top1_agreement'] for e in entries]
+        
+        summary[f"span_{key[0]}_dtype_{key[1]}"] = {
+            'span': key[0],
+            'dtype': key[1],
+            'max_abs_diff': {
+                'max': max(max_diffs),
+                'mean': statistics.mean(max_diffs) if max_diffs else 0,
+                'p95': sorted(max_diffs)[int(len(max_diffs) * 0.95)] if len(max_diffs) > 1 else max_diffs[0] if max_diffs else 0
+            },
+            'p99_abs_diff': {
+                'max': max(p99_diffs),
+                'mean': statistics.mean(p99_diffs) if p99_diffs else 0
+            },
+            'top1_agreement': {
+                'min': min(top1_vals),
+                'mean': statistics.mean(top1_vals) if top1_vals else 1.0
+            },
+            'sample_count': len(entries)
+        }
+    
+    return summary
+
+
+def aggregate_perf_summary(traces: dict) -> dict:
+    """Aggregate performance metrics (B3.71).
+    
+    Returns by (span, dtype, mode): wall_time stats, IO bytes stats
+    """
+    perf_data = defaultdict(list)
+    
+    for key, data in traces.items():
+        if data.get('status') == 'SKIPPED':
+            continue
+        perf = data.get('perf')
+        if not perf:
+            continue
+        
+        span, dtype, kv, seed, mode = key
+        agg_key = (span, dtype, mode)
+        perf_data[agg_key].append({
+            'wall_time': perf.get('wall_time_sec', 0),
+            'logits_bytes': perf.get('logits_gz_bytes', 0)
+        })
+    
+    summary = {}
+    for key, entries in perf_data.items():
+        if not entries:
+            continue
+        
+        wall_times = [e['wall_time'] for e in entries]
+        io_bytes = [e['logits_bytes'] for e in entries]
+        
+        sorted_times = sorted(wall_times)
+        p95_idx = min(int(len(sorted_times) * 0.95), len(sorted_times) - 1)
+        
+        summary[f"span_{key[0]}_dtype_{key[1]}_{key[2]}"] = {
+            'span': key[0],
+            'dtype': key[1],
+            'mode': key[2],
+            'wall_time_sec': {
+                'mean': statistics.mean(wall_times) if wall_times else 0,
+                'p95': sorted_times[p95_idx] if sorted_times else 0,
+                'min': min(wall_times) if wall_times else 0,
+                'max': max(wall_times) if wall_times else 0
+            },
+            'logits_gz_bytes': {
+                'mean': int(statistics.mean(io_bytes)) if io_bytes else 0,
+                'total': sum(io_bytes)
+            },
+            'sample_count': len(entries)
+        }
+    
+    return summary
+
+
+def run_sweep_analysis(traces_dir: str, output_path: str) -> int:
+    """Run B3.70-71-72 sweep analysis.
+    
+    Returns exit code: 0 = PASS, 1 = FAIL
+    """
+    traces_dir = Path(traces_dir)
+    output_path = Path(output_path)
+    output_dir = output_path.parent
+    
+    print(f"[B3.70-71-72] Loading sweep traces from: {traces_dir}")
+    traces = load_traces_sweep(traces_dir)
+    
+    if not traces:
+        print("ERROR: No sweep traces found")
+        return 1
+    
+    # Load root config
+    config_path = traces_dir / 'config.json'
+    root_config = None
+    if config_path.exists():
+        with open(config_path) as f:
+            root_config = json.load(f)
+    
+    # Organize by (span, dtype, kv_aligned, seed) pairs
+    pairs = defaultdict(dict)
+    skipped = []
+    
+    for key, data in traces.items():
+        span, dtype, kv, seed, mode = key
+        pair_key = (span, dtype, kv, seed)
+        
+        if data.get('status') == 'SKIPPED':
+            skipped.append({'span': span, 'dtype': dtype, 'kv': kv, 'seed': seed, 'mode': mode})
+            continue
+        
+        pairs[pair_key][mode] = data
+    
+    # Analyze each pair
+    results = []
+    warnings = []
+    
+    for pair_key, modes in sorted(pairs.items()):
+        span, dtype, kv, seed = pair_key
+        
+        if 'prefill' not in modes or 'decode' not in modes:
+            results.append({
+                'span': span, 'dtype': dtype, 'kv_aligned': kv, 'seed': seed,
+                'verdict': 'INCOMPLETE', 'metrics': {'status': 'MISSING_MODE'}
+            })
+            continue
+        
+        prefill = modes['prefill']
+        decode = modes['decode']
+        
+        prefill_logits = prefill.get('logits_path')
+        decode_logits = decode.get('logits_path')
+        
+        if not prefill_logits or not decode_logits:
+            results.append({
+                'span': span, 'dtype': dtype, 'kv_aligned': kv, 'seed': seed,
+                'verdict': 'INCOMPLETE', 'metrics': {'status': 'MISSING_LOGITS'}
+            })
+            continue
+        
+        # Compute logits diff
+        metrics = compute_logits_diff(prefill_logits, decode_logits)
+        
+        # Determine verdict
+        if int(kv) == 1:
+            # Gate: must pass thresholds
+            p99 = metrics.get('p99_abs_diff')
+            max_diff = metrics.get('max_abs_diff')
+            top1 = metrics.get('top1_agreement')
+            
+            if metrics.get('status') != 'OK':
+                verdict = 'FAIL_EQUIV'
+            elif (p99 is not None and p99 <= 1e-3 and
+                  max_diff is not None and max_diff <= 5e-3 and
+                  top1 is not None and top1 >= 0.999):
+                verdict = 'PASS_EQUIV'
+            else:
+                verdict = 'FAIL_EQUIV'
+        else:
+            # kv_aligned=0: No gate, just characterize drift
+            verdict = 'EXPECTED_DRIFT'
+            
+            # Check for drift warnings (B3.70)
+            p99 = metrics.get('p99_abs_diff', 0)
+            top1 = metrics.get('top1_agreement', 1.0)
+            if p99 is not None and p99 > 0.1:
+                warnings.append(f"WARN_DRIFT_SPIKE: span={span} dtype={dtype} seed={seed} p99={p99:.6f}")
+            if top1 is not None and top1 < 0.9:
+                warnings.append(f"WARN_LOW_TOP1: span={span} dtype={dtype} seed={seed} top1={top1:.4f}")
+        
+        results.append({
+            'span': span, 'dtype': dtype, 'kv_aligned': kv, 'seed': seed,
+            'verdict': verdict, 'metrics': metrics,
+            'prefill_perf': prefill.get('perf'),
+            'decode_perf': decode.get('perf')
+        })
+    
+    # Aggregate summaries
+    drift_summary = aggregate_drift_summary(results)
+    perf_summary = aggregate_perf_summary(traces)
+    
+    # Compute global verdict
+    pass_count = sum(1 for r in results if r['verdict'] == 'PASS_EQUIV')
+    fail_count = sum(1 for r in results if r['verdict'] == 'FAIL_EQUIV')
+    drift_count = sum(1 for r in results if r['verdict'] == 'EXPECTED_DRIFT')
+    incomplete_count = sum(1 for r in results if r['verdict'] == 'INCOMPLETE')
+    
+    if incomplete_count > 0 and len(skipped) == 0:
+        global_verdict = 'INCOMPLETE'
+    elif fail_count > 0:
+        global_verdict = 'FAIL'
+    elif len(skipped) > 0 and pass_count > 0:
+        global_verdict = 'PASS_WITH_SKIPS'
+    elif pass_count > 0:
+        global_verdict = 'PASS'
+    else:
+        global_verdict = 'INCONCLUSIVE'
+    
+    # Generate report
+    report_lines = [
+        "# B3.70-71-72 Sweep Report",
+        "",
+        f"**Date:** {datetime.now().strftime('%Y-%m-%d')}",
+        f"**Mode:** Span Escalation + Dtype Sweep + Drift Characterization",
+        "",
+        "## Global Verdict",
+        "",
+        f"**{global_verdict}**",
+        "",
+        f"- PASS_EQUIV: {pass_count}",
+        f"- FAIL_EQUIV: {fail_count}",
+        f"- EXPECTED_DRIFT: {drift_count}",
+        f"- INCOMPLETE: {incomplete_count}",
+        f"- SKIPPED: {len(skipped)}",
+        "",
+    ]
+    
+    if warnings:
+        report_lines.extend([
+            "## Warnings",
+            "",
+            *[f"- {w}" for w in warnings],
+            "",
+        ])
+    
+    # Results table
+    report_lines.extend([
+        "## Comparison Results",
+        "",
+        "| span | dtype | kv_aligned | seed | max_abs_diff | p99_abs_diff | top1_agreement | verdict |",
+        "|------|-------|------------|------|--------------|--------------|----------------|---------|",
+    ])
+    
+    for r in results:
+        m = r.get('metrics', {})
+        max_d = f"{m.get('max_abs_diff', 'N/A'):.6f}" if isinstance(m.get('max_abs_diff'), (int, float)) else 'N/A'
+        p99_d = f"{m.get('p99_abs_diff', 'N/A'):.6f}" if isinstance(m.get('p99_abs_diff'), (int, float)) else 'N/A'
+        top1 = f"{m.get('top1_agreement', 'N/A'):.4f}" if isinstance(m.get('top1_agreement'), (int, float)) else 'N/A'
+        report_lines.append(
+            f"| {r['span']} | {r['dtype']} | {r['kv_aligned']} | {r['seed']} | {max_d} | {p99_d} | {top1} | {r['verdict']} |"
+        )
+    
+    report_lines.append("")
+    
+    # Drift characterization section (B3.70)
+    if drift_summary:
+        report_lines.extend([
+            "## Drift Characterization (kv_aligned=0)",
+            "",
+            "| span | dtype | max_abs_diff (max/mean) | top1_agreement (min/mean) | samples |",
+            "|------|-------|-------------------------|---------------------------|---------|",
+        ])
+        for key, data in sorted(drift_summary.items()):
+            max_d = data['max_abs_diff']
+            top1 = data['top1_agreement']
+            report_lines.append(
+                f"| {data['span']} | {data['dtype']} | {max_d['max']:.6f} / {max_d['mean']:.6f} | {top1['min']:.4f} / {top1['mean']:.4f} | {data['sample_count']} |"
+            )
+        report_lines.append("")
+    
+    # Performance section (B3.71)
+    if perf_summary:
+        report_lines.extend([
+            "## Performance Profiling",
+            "",
+            "| span | dtype | mode | wall_time (mean/p95) | logits_bytes (mean) | samples |",
+            "|------|-------|------|----------------------|---------------------|---------|",
+        ])
+        for key, data in sorted(perf_summary.items()):
+            wt = data['wall_time_sec']
+            io = data['logits_gz_bytes']
+            report_lines.append(
+                f"| {data['span']} | {data['dtype']} | {data['mode']} | {wt['mean']:.2f}s / {wt['p95']:.2f}s | {io['mean']:,} | {data['sample_count']} |"
+            )
+        report_lines.append("")
+    
+    # Skipped section
+    if skipped:
+        report_lines.extend([
+            "## Skipped Runs (Unsupported Dtype)",
+            "",
+            *[f"- span={s['span']} dtype={s['dtype']} kv={s['kv']} seed={s['seed']} mode={s['mode']}" for s in skipped],
+            "",
+        ])
+    
+    # Write report
+    with open(output_path, 'w') as f:
+        f.write('\n'.join(report_lines))
+    print(f"Report written to: {output_path}")
+    
+    # Write summary.json
+    summary_json_path = output_dir / 'summary.json'
+    summary_data = {
+        'timestamp': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
+        'global_verdict': global_verdict,
+        'verdicts': {
+            'pass_equiv': pass_count,
+            'fail_equiv': fail_count,
+            'expected_drift': drift_count,
+            'incomplete': incomplete_count
+        },
+        'skipped_count': len(skipped),
+        'warnings': warnings,
+        'config': root_config,
+        'results': results
+    }
+    with open(summary_json_path, 'w') as f:
+        json.dump(summary_data, f, indent=2)
+    print(f"Summary JSON written to: {summary_json_path}")
+    
+    # Write drift_summary.json
+    if drift_summary:
+        drift_json_path = output_dir / 'drift_summary.json'
+        with open(drift_json_path, 'w') as f:
+            json.dump(drift_summary, f, indent=2)
+        print(f"Drift summary written to: {drift_json_path}")
+    
+    # Write perf_summary.json
+    if perf_summary:
+        perf_json_path = output_dir / 'perf_summary.json'
+        with open(perf_json_path, 'w') as f:
+            json.dump(perf_summary, f, indent=2)
+        print(f"Perf summary written to: {perf_json_path}")
+    
+    print(f"\nGlobal verdict: {global_verdict}")
+    
+    return 0 if global_verdict in ['PASS', 'PASS_WITH_SKIPS'] else 1
+
+
 def validate_pairing(prefill_entries: list, decode_entries: list) -> dict:
     """Validate that prefill and decode entries can be paired correctly."""
     errors = []
@@ -535,8 +972,8 @@ def main():
                         help='Expected seeds (comma-separated)')
     parser.add_argument('--kv-aligned', type=str, default='0,1',
                         help='Expected kv_aligned values (comma-separated)')
-    parser.add_argument('--mode', type=str, default='b3_67', choices=['b3_67', 'b3_69'],
-                        help='Analysis mode: b3_67 (metadata-only) or b3_69 (real logits-diff)')
+    parser.add_argument('--mode', type=str, default='b3_67', choices=['b3_67', 'b3_69', 'b3_70_71_72'],
+                        help='Analysis mode: b3_67 (metadata-only), b3_69 (real logits-diff), b3_70_71_72 (sweep)')
     
     args = parser.parse_args()
     
@@ -546,6 +983,10 @@ def main():
             args.seeds.split(','),
             args.kv_aligned.split(',')
         )
+    
+    # B3.70-71-72 sweep mode: use dedicated analysis path
+    if args.mode == 'b3_70_71_72':
+        return run_sweep_analysis(args.traces_dir, args.output)
     
     print(f"Loading traces from: {args.traces_dir}")
     
