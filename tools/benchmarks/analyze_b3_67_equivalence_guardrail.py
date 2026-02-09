@@ -1787,6 +1787,8 @@ def run_b3_75_ci_analysis(traces_dir_str: str, output_path: str, baseline_path: 
         'optimization_notes': opt_notes
     }
     with open(Path(output_path).parent / "summary.json", 'w') as f:
+        json.dump(summary, f, indent=2)
+
     return 1 if (completeness_verdict == "INCOMPLETE" or stats['fail_equiv'] > 0) else 0
     
 # -----------------------------------------------------------------------------

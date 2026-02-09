@@ -48,7 +48,7 @@ RUN_ROOT="$OUT_ROOT/$DATE/b3_76"
 LOCAL_RUNS_DIR="$RUN_ROOT/runs"
 mkdir -p "$LOCAL_RUNS_DIR"
 
-SSH_OPTS="-o StrictHostKeyChecking=no -o ControlMaster=auto -o ControlPath=/tmp/ssh-greta-b376-%r@%h:%p -o ControlPersist=600"
+SSH_OPTS="-o StrictHostKeyChecking=no"
 
 echo "=== B3.76 Long-Context & Memory Pressure Runner ==="
 echo "Host: $HOST"
@@ -121,16 +121,22 @@ for KV in "${KV_ARR[@]}"; do
 
         # 2. Start VRAM Monitoring (Background)
         VRAM_SAMPLE_FILE="$REMOTE_OUT/vram_samples.csv"
+        SAMPLER_SCRIPT="$REMOTE_OUT/sampler.sh"
+        
         ssh $SSH_OPTS "root@$HOST" "
             mkdir -p $REMOTE_OUT
+            cat > $SAMPLER_SCRIPT << 'SAMPLER_EOF'
+#!/bin/bash
+while true; do
+    val=\$(rocm-smi --showmeminfo vram --json | python3 -c 'import sys, json; d=json.load(sys.stdin); print(list(d.values())[0][\"VRAM Total Used Memory (B)\"])')
+    mb=\$(echo \"\$val / 1048576\" | bc)
+    echo \"\$(date +%s),\$mb\" >> $VRAM_SAMPLE_FILE
+    sleep 1
+done
+SAMPLER_EOF
+            chmod +x $SAMPLER_SCRIPT
             if command -v rocm-smi >/dev/null 2>&1; then
-                # Background sampler: timestamp, used_vram_mb
-                (while true; do
-                    val=\$(rocm-smi --showmeminfo vram --json | python3 -c 'import sys, json; d=json.load(sys.stdin); print(d[\"card0\"][\"VRAM Total Memory (B)\"][\"Used\"])')
-                    mb=\$(echo \"\$val / 1048576\" | bc)
-                    echo \"\$(date +%s),\$mb\" >> $VRAM_SAMPLE_FILE
-                    sleep 1
-                done) &
+                nohup $SAMPLER_SCRIPT > $REMOTE_OUT/sampler.log 2>&1 &
                 echo \$! > $REMOTE_OUT/vram_monitor.pid
             else
                 echo \"VRAM Monitoring UNAVAILABLE\"
@@ -139,10 +145,6 @@ for KV in "${KV_ARR[@]}"; do
 
         # 3. Run Inference
         START_TS=$(date +%s.%N)
-        
-        # Determine modes: we usually do both prefill and decode if it's following the guardrail pattern
-        # But B3.76 might be a single end-to-end run to test pressure.
-        # "compare first 32 generated tokens" implies we want prefill then decode.
         
         MODES=("prefill" "decode")
         EXIT_CODE=0
@@ -222,10 +224,6 @@ for KV in "${KV_ARR[@]}"; do
                 
                 scp -q $SSH_OPTS "root@$HOST:$MODE_REMOTE_OUT/metadata.json" "$MODE_LOCAL_OUT/" || true
                 scp -q $SSH_OPTS "root@$HOST:$MODE_REMOTE_OUT/logits.jsonl.gz" "$MODE_LOCAL_OUT/" || true
-                
-                # Fetch wall time from metadata or log? Let's use metadata if possible.
-                # If metadata doesn't have it, we can use the START/END TS we took.
-                # But metadata should have it.
                 
                 cat > "$MODE_LOCAL_OUT/perf.json" << PERF_EOF
 {
