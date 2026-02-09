@@ -70,7 +70,7 @@ target_compile_definitions(greta_infer PRIVATE
     __HIP_PLATFORM_AMD__=1
 )
 target_link_directories(greta_infer PRIVATE ${ROCM_PATH}/lib)
-target_link_libraries(greta_infer PRIVATE amdhip64 OpenMP::OpenMP_CXX)
+target_link_libraries(greta_infer PRIVATE amdhip64 OpenMP::OpenMP_CXX z)
 
 # SentencePiece linkage
 if(GRETA_USE_SENTENCEPIECE)
