@@ -1829,9 +1829,9 @@ def load_b3_76_runs(traces_dir: Path):
             
     return config, runs
 
-def run_b3_76_memory_pressure_analysis(traces_dir_str: str, output_path: str) -> int:
+def run_b3_76_memory_pressure_analysis(traces_dir_str: str, output_path: str, ticket: str = 'B3.76') -> int:
     traces_dir = Path(traces_dir_str)
-    print(f"[B3.76] Loading runs from: {traces_dir}")
+    print(f"[{ticket}] Loading runs from: {traces_dir}")
     
     config, runs = load_b3_76_runs(traces_dir)
     if config is None:
@@ -1901,7 +1901,7 @@ def run_b3_76_memory_pressure_analysis(traces_dir_str: str, output_path: str) ->
 
     # Report
     with open(output_path, 'w') as f:
-        f.write("# B3.76 Long-Context & Memory Pressure Report\n\n")
+        f.write(f"# {ticket} Long-Context Report\n\n")
         f.write(f"**Global Verdict:** {global_verdict}\n\n")
         
         f.write("## Context Matrix & VRAM\n\n")
@@ -1922,7 +1922,7 @@ def run_b3_76_memory_pressure_analysis(traces_dir_str: str, output_path: str) ->
     
     # JSON Summary
     summary = {
-        'ticket': 'B3.76',
+        'ticket': ticket,
         'global_verdict': global_verdict,
         'results': results,
         'skips': skips
@@ -1965,6 +1965,10 @@ def main():
     # B3.76 Pressure mode
     if args.mode == 'b3_76':
         return run_b3_76_memory_pressure_analysis(args.traces_dir, args.output)
+
+    # B3.77 32k Probe mode
+    if args.mode == 'b3_77':
+        return run_b3_76_memory_pressure_analysis(args.traces_dir, args.output, ticket='B3.77')
 
     # B3.73 reconciliation mode: use dedicated analysis path
     if args.mode == 'b3_73':
