@@ -2111,6 +2111,121 @@ def run_b3_76_memory_pressure_analysis(traces_dir_str: str, output_path: str, ti
     
     return 0 if global_verdict == 'PASS' or global_verdict == 'PASS_EQUIV' else 1
 
+def run_b3_81_throughput_analysis(traces_dir_str: str, output_path: str) -> int:
+    traces_dir = Path(traces_dir_str)
+    print(f"[B3.81] Loading throughput runs from: {traces_dir}")
+    
+    config, runs = load_b3_76_runs(traces_dir)
+    if config is None:
+        print(f"[ERROR] No config.json found in {traces_dir}")
+        return 1
+
+    # Group runs into pairs by batch size
+    pairs = defaultdict(dict)
+    for r in runs:
+        batch = r['batch']
+        mode = r.get('phase') or r.get('mode')
+        if mode:
+            pairs[batch][mode] = r
+
+    results = []
+    global_verdict = 'PASS'
+    
+    THRESH_P99 = 1e-3
+    THRESH_MAX = 5e-3
+    THRESH_TOP1 = 0.999
+
+    for batch, modes in sorted(pairs.items()):
+        row = {
+            'batch': batch, 'verdict': 'INCOMPLETE', 
+            'max_diff': None, 'top1': None, 
+            'peak_vram': 0, 'prefill_time': None, 'decode_time': None,
+            'tokens_per_sec': 0, 'vram_meta': {}
+        }
+        
+        if 'prefill' in modes and 'decode' in modes:
+            p_run = modes['prefill']
+            d_run = modes['decode']
+            
+            row['prefill_time'] = p_run.get('wall_time_sec')
+            row['decode_time'] = d_run.get('wall_time_sec')
+            row['tokens_per_sec'] = d_run.get('tokens_per_sec', 0)
+            row['peak_vram'] = p_run.get('vram', {}).get('peak_vram_mb', 0)
+            row['vram_meta'] = p_run.get('vram', {})
+            
+            if p_run.get('exit_status', 'OK') == 'OK' and d_run.get('exit_status', 'OK') == 'OK':
+                if p_run['_logits'] and d_run['_logits'] and os.path.exists(p_run['_logits']) and os.path.exists(d_run['_logits']):
+                    metrics = compute_logits_diff(p_run['_logits'], d_run['_logits'])
+                    if metrics.get('status') == 'OK':
+                        row['max_diff'] = metrics['max_abs_diff']
+                        row['top1'] = metrics['top1_agreement']
+                        
+                        if (metrics['p99_abs_diff'] <= THRESH_P99 and row['max_diff'] <= THRESH_MAX and row['top1'] >= THRESH_TOP1):
+                            row['verdict'] = 'PASS_EQUIV'
+                        else:
+                            row['verdict'] = 'FAIL_EQUIV'
+                            global_verdict = 'FAIL'
+                    else:
+                        row['verdict'] = 'ERROR_LOGITS'
+                        global_verdict = 'FAIL'
+                else:
+                    row['verdict'] = 'MISSING_LOGITS'
+                    global_verdict = 'FAIL'
+            else:
+                st = p_run.get('exit_status', 'FAIL_ERROR')
+                row['verdict'] = st
+                if st != "SKIPPED_UNSUPPORTED_BATCH":
+                    global_verdict = 'FAIL'
+
+        results.append(row)
+
+    # Scaling Calculation
+    scaling = []
+    base_tps = next((r['tokens_per_sec'] for r in results if r['batch'] == 1 and r['verdict'] == 'PASS_EQUIV'), None)
+    base_vram = next((r['peak_vram'] for r in results if r['batch'] == 1 and r['verdict'] == 'PASS_EQUIV'), None)
+    
+    for r in results:
+        s = {'batch': r['batch'], 'speedup': 1.0, 'vram_delta_mb': 0}
+        if base_tps and r['tokens_per_sec']:
+            s['speedup'] = r['tokens_per_sec'] / base_tps
+        if base_vram and r['peak_vram']:
+            s['vram_delta_mb'] = r['peak_vram'] - base_vram
+        scaling.append(s)
+
+    # Markdown Report
+    with open(output_path, 'w') as f:
+        f.write("# B3.81 Multi-Batch Throughput Scaling Report\n\n")
+        f.write(f"**Global Verdict:** {global_verdict}\n\n")
+        
+        f.write("## Throughput & VRAM Scaling\n\n")
+        f.write("| Batch | Peak VRAM (MB) | Prefill (s) | Decode (s) | Tokens/s | Speedup | VRAM Delta | Verdict |\n")
+        f.write("|---|---|---|---|---|---|---|---|\n")
+        for r, s in zip(results, scaling):
+            max_d = f"{r['max_diff']:.6f}" if r['max_diff'] is not None else "N/A"
+            p_t = f"{r['prefill_time']:.2f}" if r['prefill_time'] is not None else "N/A"
+            d_t = f"{r['decode_time']:.2f}" if r['decode_time'] is not None else "N/A"
+            speedup = f"{s['speedup']:.2fx}"
+            vram_delta = f"{s['vram_delta_mb']:+d} MB"
+            f.write(f"| {r['batch']} | {r['peak_vram']} | {p_t} | {d_t} | {r['tokens_per_sec']} | {speedup} | {vram_delta} | {r['verdict']} |\n")
+
+    print(f"Report written to: {output_path}")
+
+    # JSON Summary
+    summary = {
+        'ticket': "B3.81",
+        'global_verdict': global_verdict,
+        'config': config,
+        'results': results,
+        'scaling': scaling,
+        'timestamp': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+    }
+    summary_path = Path(output_path).parent / "summary.json"
+    with open(summary_path, 'w') as f:
+        json.dump(summary, f, indent=2)
+    print(f"Summary written to: {summary_path}")
+
+    return 0 if global_verdict in ['PASS', 'PASS_EQUIV'] else 1
+
 def main():
     parser = argparse.ArgumentParser(description='B3.67 Equivalence Guardrail Analyzer')
     parser.add_argument('--traces-dir', type=str, required=True,
@@ -2125,8 +2240,8 @@ def main():
                         help='Expected seeds (comma-separated)')
     parser.add_argument('--kv-aligned', type=str, default='0,1',
                         help='Expected kv_aligned values (comma-separated)')
-    parser.add_argument('--mode', type=str, default='b3_67', choices=['b3_67', 'b3_69', 'b3_70_71_72', 'b3_73', 'b3_74', 'b3_75', 'b3_76', 'b3_77', 'b3_78_80'],
-                        help='Analysis mode: b3_67 (metadata), b3_69 (logits), b3_70+ (sweep), b3_73 (reconcile), b3_74 (internal), b3_75 (CI), b3_76 (pressure), b3_77 (32k), b3_78_80 (suite)')
+    parser.add_argument('--mode', type=str, default='b3_67', choices=['b3_67', 'b3_69', 'b3_70_71_72', 'b3_73', 'b3_74', 'b3_75', 'b3_76', 'b3_77', 'b3_78_80', 'b3_81'],
+                        help='Analysis mode: b3_67 (metadata), b3_69 (logits), b3_70+ (sweep), b3_73 (reconcile), b3_74 (internal), b3_75 (CI), b3_76 (pressure), b3_77 (32k), b3_78_80 (suite), b3_81 (batch)')
     
     args = parser.parse_args()
     
@@ -2156,6 +2271,10 @@ def main():
     # B3.78-80 suite mode
     if args.mode == 'b3_78_80':
         return run_b3_78_80_suite_analysis(args.traces_dir, args.output)
+
+    # B3.81 batch mode
+    if args.mode == 'b3_81':
+        return run_b3_81_throughput_analysis(args.traces_dir, args.output)
     
     # B3.74 internal audit mode
     if args.mode == 'b3_74':

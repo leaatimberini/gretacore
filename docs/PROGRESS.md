@@ -20,6 +20,7 @@
 **B3.78**: COMPLETED - 32k KV-Aligned Control (PASS_EQUIV; diff=0.0 at 32k)
 **B3.79**: COMPLETED - Batch Size Probe (8k/16k) (PASS; batch=2 stable)
 **B3.80**: COMPLETED - Micro-Soak Repetition (16k) (PASS; 5/5 determinism)
+**B3.81**: IN_PROGRESS - Multi-Batch Throughput Scaling (8k)
 
 ---
 
