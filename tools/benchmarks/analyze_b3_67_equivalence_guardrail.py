@@ -28,6 +28,7 @@ from pathlib import Path
 import statistics
 import math
 from datetime import datetime, timezone
+from typing import Union
 
 
 def parse_trace_line(line):
@@ -225,11 +226,14 @@ def compute_comparison_metrics(prefill_states: list, decode_states: list) -> dic
     return metrics
 
 
-def compute_logits_diff(prefill_logits_path: str, decode_logits_path: str) -> dict:
-    """Compare logits between prefill and decode from real logits.jsonl.gz files.
+def compute_logits_diff(prefill_input: Union[str, list], decode_input: Union[str, list]) -> dict:
+    """Compare logits between prefill and decode.
     
-    For B3.69: Real numeric comparison of full logits arrays.
-    Returns: max_abs_diff, p99_abs_diff, top1_agreement, status
+    Args:
+        prefill_input: Path to logits.jsonl.gz OR list of entries
+        decode_input: Path to logits.jsonl.gz OR list of entries
+    
+    Returns: dict with max_abs_diff, p99_abs_diff, top1_agreement, status
     """
     def load_logits_file(path: str) -> list:
         """Load logits entries from gzipped JSONL file."""
@@ -244,9 +248,16 @@ def compute_logits_diff(prefill_logits_path: str, decode_logits_path: str) -> di
             print(f"  Warning: Could not load logits from {path}: {e}")
         return entries
     
-    # Load logits from both files
-    prefill_entries = load_logits_file(prefill_logits_path)
-    decode_entries = load_logits_file(decode_logits_path)
+    # Load logits from inputs
+    if isinstance(prefill_input, list):
+        prefill_entries = prefill_input
+    else:
+        prefill_entries = load_logits_file(prefill_input)
+        
+    if isinstance(decode_input, list):
+        decode_entries = decode_input
+    else:
+        decode_entries = load_logits_file(decode_input)
     
     if not prefill_entries or not decode_entries:
         return {'status': 'MISSING_LOGITS', 'prefill_count': len(prefill_entries), 
