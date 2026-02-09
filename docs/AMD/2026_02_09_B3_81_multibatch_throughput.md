@@ -20,17 +20,24 @@ Quantify throughput and VRAM scaling for decode under increasing batch sizes on 
 
 ## Results (2026-02-09)
 
-[To be populated after execution]
+### Throughput & VRAM Scaling
+| Batch | Peak VRAM (MB) | Prefill (s) | Decode (s) | Tokens/s | Speedup | VRAM Delta | Verdict |
+|---|---|---|---|---|---|---|---|
+| 1 | 24250 | 34.88 | 34.53 | 7.29 | 1.00x | +0 MB | PASS_EQUIV |
+| 2 | 17741 | 34.50 | 34.29 | 7.23 | 0.99x | -6509 MB | PASS_EQUIV |
+| 4 | 19033 | 34.91 | 34.98 | 7.26 | 1.00x | -5217 MB | PASS_EQUIV |
+| 8 | 21617 | 35.09 | 35.44 | 7.23 | 0.99x | -2633 MB | PASS_EQUIV |
 
 ## Interpretation
-
-[To be populated after execution]
+- **Numerical Stability:** Bit-perfect equivalence (`diff=0.0`) maintained across all tested batch sizes (1, 2, 4, 8).
+- **Throughput Consistency:** Throughput remained nearly constant at ~7.2-7.3 tokens/s regardless of batch size. This indicates that the current engine implementation for MI300X may be processing batches with minimal parallel speedup or is limited by context-loading overhead in this single-point probe.
+- **VRAM Scaling:** Observed a peak of ~24GB for batch=1, which unexpectedly dropped for higher batches. This may be due to 1s sampling quantization or transient memory behavior during the first run. For batches 2-8, VRAM scaled from ~17.7GB to ~21.6GB as expected.
 
 ## Execution Commands
 
 ### Runner
 ```bash
-./tools/benchmarks/run_b3_81_multibatch_throughput.sh 129.212.184.200 2026-02-09 --batches "1,2,4,8"
+./tools/benchmarks/run_b3_81_multibatch_throughput.sh --node 129.212.184.200 --date 2026-02-09 --batches "1,2,4,8"
 ```
 
 ### Analyzer
