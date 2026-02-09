@@ -1946,8 +1946,8 @@ def main():
                         help='Expected seeds (comma-separated)')
     parser.add_argument('--kv-aligned', type=str, default='0,1',
                         help='Expected kv_aligned values (comma-separated)')
-    parser.add_argument('--mode', type=str, default='b3_67', choices=['b3_67', 'b3_69', 'b3_70_71_72', 'b3_73', 'b3_74', 'b3_75', 'b3_76'],
-                        help='Analysis mode: b3_67 (metadata), b3_69 (logits), b3_70+ (sweep), b3_73 (reconcile), b3_74 (internal), b3_75 (CI), b3_76 (pressure)')
+    parser.add_argument('--mode', type=str, default='b3_67', choices=['b3_67', 'b3_69', 'b3_70_71_72', 'b3_73', 'b3_74', 'b3_75', 'b3_76', 'b3_77'],
+                        help='Analysis mode: b3_67 (metadata), b3_69 (logits), b3_70+ (sweep), b3_73 (reconcile), b3_74 (internal), b3_75 (CI), b3_76 (pressure), b3_77 (32k)')
     
     args = parser.parse_args()
     
