@@ -5,7 +5,7 @@ set -euo pipefail
 # B3.74 Internal Drift Impact Audit
 # =============================================================================
 # Purpose: Quantify internal drift (attention/hidden states) on MI300X
-#          reusing B3.66 tracing mechanism but with B3.73-style matrix runner.
+#          using Direct Stage Tracing (GRETA_TRACE_STAGE) with B3.73-style matrix runner.
 #
 # Usage: ./run_b3_74_internal_drift_audit.sh <NODE_IP> [YYYY-MM-DD]
 #        [--span N] [--seeds "0,1,2"] [--kv_aligned "0,1"]
@@ -76,7 +76,7 @@ echo "Span: $SPAN"
 echo "Seeds: ${SEEDS_ARRAY[*]}"
 echo "KV aligned: ${KV_ALIGNED_ARRAY[*]}"
 echo "Prompts: ${PROMPTS_ARRAY[*]}"
-echo "Internal Dump: Enabled (via B3.66 tracing)"
+echo "Internal Dump: Enabled (via GRETA_TRACE_STAGE)"
 echo ""
 
 # -----------------------------------------------------------------------------
@@ -169,17 +169,19 @@ for PROMPT_CASE in "${PROMPTS_ARRAY[@]}"; do
                     export AMD_SERIALIZE_KERNEL=3
                     export HSA_ENABLE_SDMA=0
                     
-                    # B3.66 Tracing Flags
+                    # B3.74 Tracing Flags (Direct Stage Trace)
                     export GRETA_SEED=$SEED
-                    export GRETA_TRACE_B3_66=1
-                    export GRETA_TRACE_LAYERS='0,1,2,4,8'
-                    export GRETA_B3_66_MODE=$B366_MODE
+                    export GRETA_TRACE_STAGE=1
+                    export GRETA_TRACE_STAGE_LAYERS='0,1,2,4,8,16,24,31'
+                    export GRETA_TRACE_STAGE_POINTS='attn_out,mlp_out'
+                    export GRETA_TRACE_STAGE_PHASES='prefill,decode'
+                    export GRETA_TRACE_STAGE_OUT=$OUTDIR/internal.jsonl
 
                     mkdir -p $OUTDIR
 
                     # Run greta_infer
                     # Note: We dump logits to reconfirm B3.73 findings
-                    # The internal traces are written to CWD by GRETA_TRACE_B3_66
+                    # The internal traces are written to GRETA_TRACE_STAGE_OUT
                     ./tools/inference/build/greta_infer \\
                         --model $MODEL \\
                         --prompt tools/benchmarks/prompts/${PROMPT_CASE}.txt \\
@@ -192,17 +194,12 @@ for PROMPT_CASE in "${PROMPTS_ARRAY[@]}"; do
                         --greedy \\
                         2>&1 | tee $OUTDIR/run.log
 
-                    # Locate and move internal trace file
-                    # File name pattern: PROMPT_CASE[_decode]_trace.jsonl
-                    # We accept any jsonl in CWD that isn't logits.jsonl
-                    TRACE_FILE=\$(ls *.jsonl 2>/dev/null | grep -v 'logits' | head -n 1)
-                    
-                    if [ ! -z \"\$TRACE_FILE\" ]; then
-                        echo \"Found trace: \$TRACE_FILE\"
-                        mv \$TRACE_FILE $OUTDIR/internal.jsonl
+                    # Compress internal trace if it exists
+                    if [ -f $OUTDIR/internal.jsonl ]; then
+                        echo "Found trace: $OUTDIR/internal.jsonl"
                         gzip $OUTDIR/internal.jsonl
                     else
-                        echo \"WARNING: No internal trace file generated!\"
+                        echo "WARNING: No internal trace file generated at $OUTDIR/internal.jsonl"
                     fi
 
                     # Verify outputs
