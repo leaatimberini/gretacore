@@ -66,6 +66,7 @@
 | B3.71 | 2026-02-09 | Span Escalation + Perf | COMPLETED | PASS (32→40s, 128→56s, 512→117s) | N/A (profiling) | artifacts_remote/2026-02-09/b3_70_71_72/ | docs/AMD/2026_02_09_B3_70_71_72_sweep.md |
 | B3.72 | 2026-02-09 | Cross-Dtype Sweep | COMPLETED | PASS (bf16=fp16; max_diff=0.0) | N/A (dtype gate kv=1) | artifacts_remote/2026-02-09/b3_70_71_72/ | docs/AMD/2026_02_09_B3_70_71_72_sweep.md |
 | B3.73 | 2026-02-09 | Reconcile B3.66 vs B3.69 | COMPLETED | RECONCILED_NO_LOGIT_DRIFT (MI300X full matrix; kv=0 diff=0.0) | INTERNAL_DRIFT_NO_LOGIT_IMPACT | artifacts_remote/2026-02-09/b3_73/ | docs/AMD/2026_02_09_B3_73_reconcile_b3_66_vs_b3_69.md |
+| B3.74 | 2026-02-09 | Internal Drift Impact Audit | IN_PROGRESS | N/A (Pending Execution) | N/A (Internal State Tracing) | artifacts_remote/2026-02-09/b3_74/ | docs/AMD/2026_02_09_B3_74_internal_drift_impact_audit.md |
 
 ---
 
