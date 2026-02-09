@@ -174,7 +174,7 @@ for PROMPT_CASE in "${PROMPTS_ARRAY[@]}"; do
                     export GRETA_TRACE_STAGE=1
                     export GRETA_TRACE_STAGE_LAYERS='0,1,2,4,8,16,24,31'
                     export GRETA_TRACE_STAGE_POINTS='attn_out,mlp_out'
-                    export GRETA_TRACE_STAGE_PHASES='prefill,decode'
+                    export GRETA_TRACE_STAGE_PHASES='prefill_last,decode0'
                     export GRETA_TRACE_STAGE_OUT=$OUTDIR/internal.jsonl
 
                     mkdir -p $OUTDIR
