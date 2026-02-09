@@ -1622,21 +1622,75 @@ def compute_internal_drift_simple(p_path, d_path):
     # For now, return 0.0 unless we implement full parser
     return 0.0
 
+def generate_optimization_notes(runs, profile):
+    """
+    Analyze performance metrics (perf.json) and generate insights.
+    Focus:
+    - B3.78 Perf/IO tracking
+    - Outliers (latency spikes)
+    - KV=1 overhead vs KV=0
+    """
+    notes = []
+    
+    # helper stats
+    vals = defaultdict(list)
+    for r in runs:
+        # Group by span/dtype
+        k = f"span={r['span']}_dtype={r['dtype']}"
+        vals[k].append(r['wall_time_sec'])
+        
+    for k, times in vals.items():
+        if len(times) > 1:
+            avg = sum(times) / len(times)
+            notes.append(f"  - {k}: avg={avg:.4f}s (n={len(times)})")
+            
+    # Check for excessive overhead (KV=1 vs KV=0)
+    # Group pairs by (span, dtype, seed, prompt)
+    pairs = defaultdict(dict)
+    for r in runs:
+        key = (r['span'], r['dtype'], r['seed'], r['prompt_case'])
+        pairs[key][r['kv_aligned']] = r['wall_time_sec']
+        
+    overhead_sum = 0.0
+    overhead_count = 0
+    for key, kv_times in pairs.items():
+        if 0 in kv_times and 1 in kv_times:
+            t0 = kv_times[0]
+            t1 = kv_times[1]
+            if t0 > 0:
+                pch = (t1 - t0) / t0 * 100.0
+                overhead_sum += pch
+                overhead_count += 1
+                if pch > 10.0: # arbitrary alert
+                    span = key[0]
+                    notes.append(f"  - [WARN] High overhead ({pch:.1f}%) for span={span} kv=1 vs kv=0")
+                    
+    if overhead_count > 0:
+        avg_oh = overhead_sum / overhead_count
+        notes.append(f"  - Avg KV=1 Overhead: {avg_oh:.2f}%")
+
+    return notes
+
 def run_b3_75_ci_analysis(traces_dir_str: str, output_path: str, baseline_path: str = "baselines/mi300x/b3_75_perf_baseline.json") -> int:
     traces_dir = Path(traces_dir_str)
     print(f"[B3.75] Loading runs from: {traces_dir}")
     
-    config, runs = load_b3_75_runs(traces_dir)
+    config, all_runs = load_b3_75_runs(traces_dir)
     if config is None:
         return 1
-        
+    
+    profile = config.get('profile', 'unknown')
+    
+    # Filter runs by profile to avoid cross-contamination (e.g. smoke vs nightly)
+    runs = [r for r in all_runs if r.get('profile') == profile]
+    print(f"[B3.75] Profile: {profile}. Filtered {len(all_runs)} -> {len(runs)} runs.")
+
     # 1. Completeness
     expected, actual, missing = check_b3_75_completeness(config, runs)
     completeness_verdict = "COMPLETE" if not missing else "INCOMPLETE"
     print(f"[B3.75] Completeness: {actual}/{expected} runs. Missing: {len(missing)}")
 
-    # 2. Correctness & Drift
-    # Group by (span, dtype, kv, seed, prompt) -> {prefill, decode}
+    # 2. Correctness & Drift & Perf
     pairs = {}
     for r in runs:
         key = (r['span'], r['dtype'], r['kv_aligned'], r['seed'], r['prompt_case'])
@@ -1650,8 +1704,6 @@ def run_b3_75_ci_analysis(traces_dir_str: str, output_path: str, baseline_path: 
         'pass_internal': 0, 'warn_internal': 0,
         'perf_regressions': 0, 'baseline_missing': 0
     }
-    
-    profile = config.get('profile', 'unknown')
     
     # Analyze Pairs
     for key, modes in pairs.items():
@@ -1669,14 +1721,10 @@ def run_b3_75_ci_analysis(traces_dir_str: str, output_path: str, baseline_path: 
             
             # Logits Equivalence
             try:
-                # Use existing function
                 metrics = compute_logits_diff(p_run['_logits'], d_run['_logits'])
                 diff = metrics.get('max_abs_diff', 999.0)
                 row['logits_diff'] = diff
                 
-                # Check Gate
-                # B3.69 threshold 0.0 (bf16 might vary slightly? B3.69 said 0.0 strict)
-                # Let's say < 1e-4 safe.
                 is_pass = (diff < 1e-4) or (metrics.get('status') == 'OK' and diff == 0.0)
                 
                 if kv == 1:
@@ -1687,32 +1735,42 @@ def run_b3_75_ci_analysis(traces_dir_str: str, output_path: str, baseline_path: 
                         row['verdict'] = 'FAIL_EQUIV'
                         stats['fail_equiv'] += 1
                 else:
-                    # kv=0
                     if is_pass:
                         row['verdict'] = 'PASS'
-                        stats['pass_equiv'] += 1 # Or just count as pass?
+                        stats['pass_equiv'] += 1
                     else:
                         row['verdict'] = 'EXPECTED_DRIFT'
-                        # Not a failure
             except Exception as e:
                 print(f"[ERR] Diff failed for {key}: {e}")
                 row['verdict'] = 'ERROR'
 
-            # Internal Drift
+            # Internal Drift (warn only)
             if p_run['_internal'] and d_run['_internal']:
                  drift = compute_internal_drift_simple(p_run['_internal'], d_run['_internal'])
                  row['internal_drift'] = f"{drift:.4f}"
-                 # logic omitted for brevity in MVP
+                 if float(drift) > 1.0: stats['warn_internal'] += 1
 
         results.append(row)
+
+    # Optimization Notes
+    opt_notes = generate_optimization_notes(runs, profile)
 
     # Report Generation
     with open(output_path, 'w') as f:
         f.write(f"# B3.75 CI Report (Profile: {profile})\n\n")
-        f.write(f"**Date:** {config['date']}\n")
+        f.write(f"**Date:** {config.get('date','N/A')}\n")
         f.write(f"**Completeness:** {completeness_verdict} ({actual}/{expected})\n")
         f.write(f"**Equivalence:** {stats['pass_equiv']} PASS, {stats['fail_equiv']} FAIL\n")
         f.write(f"**Internal Drift:** {stats['warn_internal']} Warnings\n\n")
+        
+        f.write("## Optimization Notes (B3.78)\n\n")
+        if opt_notes:
+            for note in opt_notes:
+                f.write(f"{note}\n")
+        else:
+            f.write("No optimization notes generated (insufficient data).\n")
+        f.write("\n")
+
         f.write("## Correctness Matrix\n\n")
         f.write("| Span | Dtype | KV | Seed | Prompt | Verdict | Logits Diff | Internal |\n")
         f.write("|---|---|---|---|---|---|---|---|\n")
@@ -1725,7 +1783,8 @@ def run_b3_75_ci_analysis(traces_dir_str: str, output_path: str, baseline_path: 
         'ticket': 'B3.75',
         'completeness': completeness_verdict,
         'stats': stats,
-        'missing': missing
+        'missing': missing,
+        'optimization_notes': opt_notes
     }
     with open(Path(output_path).parent / "summary.json", 'w') as f:
         json.dump(summary, f, indent=2)

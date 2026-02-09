@@ -5,5 +5,30 @@
         "warn_pct": 15,
         "fail_pct": 30
     },
-    "cells": []
+    "cells": [
+        {
+            "span": 128,
+            "dtype": "bf16",
+            "kv_aligned": 1,
+            "avg_latency_s": 52.97
+        },
+        {
+            "span": 128,
+            "dtype": "fp16",
+            "kv_aligned": 1,
+            "avg_latency_s": 52.83
+        },
+        {
+            "span": 32,
+            "dtype": "bf16",
+            "kv_aligned": 1,
+            "avg_latency_s": 38.53
+        },
+        {
+            "span": 32,
+            "dtype": "fp16",
+            "kv_aligned": 1,
+            "avg_latency_s": 38.55
+        }
+    ]
 }

@@ -251,22 +251,29 @@ if ! flock -n 200; then
     exit 2
 fi
 
-# Sync
-echo "[1/4] Sync remote repo..."
-ssh -o StrictHostKeyChecking=no "root@$HOST" "cd $REMOTE_BASE && git fetch origin && git reset --hard origin/main"
+# SSH Options for persistence
+SSH_OPTS="-o StrictHostKeyChecking=no -o ControlMaster=auto -o ControlPath=/tmp/ssh-greta-%r@%h:%p -o ControlPersist=600"
 
-# Build
-echo "[2/4] Build greta_infer..."
-ssh -o StrictHostKeyChecking=no "root@$HOST" "cd $REMOTE_BASE/tools/inference/build && make -j\$(nproc)"
+# Setup (Combined to reduce connections)
+echo "[1/3] Sync, Build, Setup Directories..."
+ssh $SSH_OPTS "root@$HOST" "
+    set -e
+    mkdir -p $REMOTE_BASE
+    cd $REMOTE_BASE
+    git fetch origin
+    git reset --hard origin/main
+    cd tools/inference/build
+    make -j\$(nproc)
+    mkdir -p $REMOTE_BASE/$RUN_ROOT/runs
+"
 
-# Setup Dirs
-echo "[3/4] Setup directories..."
 mkdir -p "$LOCAL_RUNS_DIR"
-ssh -o StrictHostKeyChecking=no "root@$HOST" "mkdir -p $REMOTE_BASE/$RUN_ROOT/runs"
 
 # Config.json
 TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-GIT_COMMIT=$(ssh -o StrictHostKeyChecking=no "root@$HOST" "cd $REMOTE_BASE && git rev-parse --short HEAD")
+# Config.json
+TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+GIT_COMMIT=$(ssh $SSH_OPTS "root@$HOST" "cd $REMOTE_BASE && git rev-parse --short HEAD")
 
 cat > "$LOCAL_RUNS_DIR/config.json" << EOF
 {
@@ -296,12 +303,12 @@ cat > "$LOCAL_RUNS_DIR/config.json" << EOF
   ]
 }
 EOF
-scp -o StrictHostKeyChecking=no "$LOCAL_RUNS_DIR/config.json" "root@$HOST:$REMOTE_BASE/$RUN_ROOT/runs/"
+scp $SSH_OPTS "$LOCAL_RUNS_DIR/config.json" "root@$HOST:$REMOTE_BASE/$RUN_ROOT/runs/"
 
 # -----------------------------------------------------------------------------
 # Execution Loop
 # -----------------------------------------------------------------------------
-echo "[4/4] Execution Loop..."
+echo "[2/3] Execution Loop..."
 
 TOTAL_RUNS=0
 FAILED_RUNS=0
@@ -352,7 +359,7 @@ for SPAN in "${SPAN_ARR[@]}"; do
                         # Run
                         START_TS=$(date +%s.%N)
                         
-                        ssh -o StrictHostKeyChecking=no "root@$HOST" "
+                        ssh $SSH_OPTS "root@$HOST" "
                             mkdir -p $MODE_REMOTE_OUT
                             cd $REMOTE_BASE
                             $CMD_ENV
@@ -379,7 +386,7 @@ for SPAN in "${SPAN_ARR[@]}"; do
                         WALL_TIME=$(echo "$END_TS - $START_TS" | bc)
                         
                         # Verify Logic
-                        FILES_EXIST=$(ssh -o StrictHostKeyChecking=no "root@$HOST" "ls $MODE_REMOTE_OUT/logits.jsonl.gz 2>/dev/null")
+                        FILES_EXIST=$(ssh $SSH_OPTS "root@$HOST" "ls $MODE_REMOTE_OUT/logits.jsonl.gz 2>/dev/null")
                         
                         if [ -z "$FILES_EXIST" ]; then
                             echo "    [FAIL] $MODE: Missing logits!"
@@ -388,9 +395,9 @@ for SPAN in "${SPAN_ARR[@]}"; do
                             echo "    [PASS] $MODE (${WALL_TIME}s)"
                             
                             # SCP Back
-                            scp -q -o StrictHostKeyChecking=no "root@$HOST:$MODE_REMOTE_OUT/metadata.json" "$MODE_LOCAL_OUT/" || true
-                            scp -q -o StrictHostKeyChecking=no "root@$HOST:$MODE_REMOTE_OUT/logits.jsonl.gz" "$MODE_LOCAL_OUT/" || true
-                            scp -q -o StrictHostKeyChecking=no "root@$HOST:$MODE_REMOTE_OUT/internal.jsonl.gz" "$MODE_LOCAL_OUT/" 2>/dev/null || true
+                            scp -q $SSH_OPTS "root@$HOST:$MODE_REMOTE_OUT/metadata.json" "$MODE_LOCAL_OUT/" || true
+                            scp -q $SSH_OPTS "root@$HOST:$MODE_REMOTE_OUT/logits.jsonl.gz" "$MODE_LOCAL_OUT/" || true
+                            scp -q $SSH_OPTS "root@$HOST:$MODE_REMOTE_OUT/internal.jsonl.gz" "$MODE_LOCAL_OUT/" 2>/dev/null || true
                             
                             # Gen Perf JSON
                             LOGITS_BYTES=$(stat -c%s "$MODE_LOCAL_OUT/logits.jsonl.gz" 2>/dev/null || echo 0)
