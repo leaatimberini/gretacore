@@ -1,0 +1,9 @@
+{
+  "span": 512,
+  "dtype": "bf16",
+  "kv_aligned": 0,
+  "seed": 2,
+  "mode": "decode",
+  "wall_time_sec": 117.371637847,
+  "logits_gz_bytes": 78937041
+}

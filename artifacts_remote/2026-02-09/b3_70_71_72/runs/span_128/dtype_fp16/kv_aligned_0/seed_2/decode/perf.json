@@ -1,0 +1,9 @@
+{
+  "span": 128,
+  "dtype": "fp16",
+  "kv_aligned": 0,
+  "seed": 2,
+  "mode": "decode",
+  "wall_time_sec": 56.690599511,
+  "logits_gz_bytes": 19726091
+}
