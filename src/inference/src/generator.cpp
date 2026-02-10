@@ -839,6 +839,7 @@ Generator::generate_tokens(const std::vector<int32_t> &prompt_tokens,
   }
 
   // 1. Prefill: Process all prompt tokens at once
+  auto prefill_start = std::chrono::high_resolution_clock::now();
   if (!scheduler_->forward(prompt_tokens.data(), 0, prompt_tokens.size(),
                            err)) {
     return output;
@@ -1123,10 +1124,18 @@ Generator::generate_tokens(const std::vector<int32_t> &prompt_tokens,
     align_callback(step);
   }
 
+  auto prefill_end = std::chrono::high_resolution_clock::now();
+  if (stats) {
+    stats->prefill_time_ms =
+        std::chrono::duration<float, std::milli>(prefill_end - prefill_start)
+            .count();
+  }
+
   first_token_time = std::chrono::high_resolution_clock::now();
   first_token = false;
 
   // 2. Decode loop: Generate remaining tokens one-by-one
+  auto decode_start = std::chrono::high_resolution_clock::now();
   for (int i = 1; i < params.max_tokens; ++i) {
     if (next_token == tokenizer_->eos_id())
       break;
@@ -1468,6 +1477,8 @@ Generator::generate_tokens(const std::vector<int32_t> &prompt_tokens,
 
   auto end = std::chrono::high_resolution_clock::now();
   if (stats) {
+    stats->decode_time_ms =
+        std::chrono::duration<float, std::milli>(end - decode_start).count();
     stats->prompt_tokens = prompt_tokens.size();
     stats->generated_tokens = output.size() - prompt_tokens.size();
     stats->total_time_ms =
@@ -1486,7 +1497,15 @@ std::string Generator::generate(const std::string &prompt,
                                 const SamplingParams &params,
                                 GenerationStats *stats, TokenCallback callback,
                                 AlignmentCallback align_callback) {
+  auto start_tokenize = std::chrono::high_resolution_clock::now();
   auto prompt_tokens = tokenizer_->encode(prompt);
+  auto end_tokenize = std::chrono::high_resolution_clock::now();
+
+  if (stats) {
+    stats->tokenize_time_ms =
+        std::chrono::duration<float, std::milli>(end_tokenize - start_tokenize)
+            .count();
+  }
 
   std::string err;
   auto output_tokens =

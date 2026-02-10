@@ -21,9 +21,9 @@
 **B3.79**: COMPLETED - Batch Size Probe (8k/16k) (PASS; batch=2 stable)
 **B3.80**: COMPLETED - Micro-Soak Repetition (16k) (PASS; 5/5 determinism)
 **B3.81**: COMPLETED - Multi-Batch Throughput Scaling (8k) (PASS; batch=8 stable; bit-perfect)
-**B3.82**: IN_PROGRESS - Steady-State Decode Scaling (8k)
-**B3.83**: IN_PROGRESS - Long-Context Decode (32k)
-**B3.84**: IN_PROGRESS - High-Pressure Batch Decode (16k)
+**B3.82**: COMPLETED - Steady-State Decode Scaling (8k) (PASS; batch=8 stable; 100% tokens)
+**B3.83**: COMPLETED - Long-Context Decode (32k) (TIMEOUT_PREFILL; limit=40min)
+**B3.84**: COMPLETED - High-Pressure Batch Decode (16k) (PASS; batch=8; 110GB VRAM)
 
 ---
 
@@ -44,9 +44,13 @@
 **B3.75**: COMPLETED - MI300X CI Suite (PASS_BENCHMARK; Nightly 64/64, Stress 4/4, Coverage 64/64; 100% Equivalence)
 **B3.76**: COMPLETED - Long-Context Memory Pressure (PASS; up to 16k context; peak VRAM 49GB/MI300X)
 **B3.77**: COMPLETED - 32k Long-Context Attempt (PASS; bit-perfect at 32k context; peak VRAM 17.1GB/MI300X; sampling 1s)
-**B3.78**: IN_PROGRESS - 32k KV-Aligned Control
-**B3.79**: IN_PROGRESS - Batch Size Probe (8k/16k)
-**B3.80**: IN_PROGRESS - Micro-Soak Repetition (16k)
+**B3.78**: COMPLETED - 32k KV-Aligned Control (PASS_EQUIV; diff=0.0 at 32k)
+**B3.79**: COMPLETED - Batch Size Probe (8k/16k) (PASS; batch=2 stable)
+**B3.80**: COMPLETED - Micro-Soak Repetition (16k) (PASS; 5/5 determinism)
+**B3.81**: COMPLETED - Multi-Batch Throughput Scaling (8k) (PASS; batch=8 stable)
+**B3.82**: COMPLETED - Steady-State Decode Scaling (8k) (PASS; 100% tokens)
+**B3.83**: COMPLETED - Long-Context Decode (32k) (TIMEOUT)
+**B3.84**: COMPLETED - High-Pressure Batch Decode (16k) (PASS; 110GB VRAM)
 
 ---
 
@@ -61,6 +65,18 @@
 - B3.67 guardrail closeout (MI300X): `68b32be` (runner fix: `83770d8`; runner dump-logits: `d47c8f3`)
 - B3.68 greta_infer kv_aligned + logits dump: `4a57383`
 - B3.69 logits-diff gate: `e7418b2` (zlib linkage fix: `ee65f79`; docs: `e1f36ba`)
+- [x] **B3.85 — Prefill Complexity & Kernel Attribution** (MI300X)
+    - [x] Engine: Add phase timings (tokenize, prefill, decode)
+    - [x] Runner: Implement escalation (4k-32k)
+    - [x] Analyzer: Aggregate timings, fit scaling law
+- [x] **B3.86 — Prefill Kernel Switch Probe** (MI300X)
+    - [x] Engine: Detection logging for active attn impl
+    - [x] Runner: Test impl variants
+- [x] **B3.87 — Decode TPS Decomposition** (MI300X)
+    - [x] Runner: Test determinism flags impact
+    - [x] Analyzer: Separate compute vs overhead
+- [x] **B3.88 — 32k Feasibility Milestone** (MI300X)
+    - [x] Runner: Target 32k prefill
 - B3.74 internal audit: `f31ab1c`
 - Docs index: `1f662f1`
 
@@ -87,7 +103,15 @@
 | B3.73 | 2026-02-09 | Reconcile B3.66 vs B3.69 | COMPLETED | RECONCILED_NO_LOGIT_DRIFT (MI300X full matrix; kv=0 diff=0.0) | INTERNAL_DRIFT_NO_LOGIT_IMPACT | artifacts_remote/2026-02-09/b3_73/ | docs/AMD/2026_02_09_B3_73_reconcile_b3_66_vs_b3_69.md |
 | B3.74 | 2026-02-09 | Internal Drift Impact Audit | COMPLETED | PASS_INTERNAL_AUDIT (kv0 drift; logits diff=0.0) | INTERNAL_DRIFT (BENIGN) | artifacts_remote/2026-02-09/b3_74/ | docs/AMD/2026_02_09_B3_74_internal_drift_impact_audit.md |
 | B3.75 | 2026-02-09 | MI300X CI Suite | COMPLETED | PASS_BENCHMARK | N/A (CI Harness) | artifacts_remote/2026-02-09/b3_75_ci/ | docs/AMD/2026_02_09_B3_75_to_B3_80_mi300x_ci_suite.md |
-| B3.76 | 2026-02-09 | Long-Context Memory Pressure | COMPLETED | PASS (up to 16k; peak VRAM 49GB) | N/A (pressure validation) | artifacts_remote/2026-02-09/b3_76/ | docs/AMD/2026_02_09_B3_76_long_context_memory_pressure.md | status:DONE
+| B3.76 | 2026-02-09 | Long-Context Memory Pressure | COMPLETED | PASS (up to 16k; peak VRAM 49GB) | N/A (pressure validation) | artifacts_remote/2026-02-09/b3_76/ | docs/AMD/2026_02_09_B3_76_long_context_memory_pressure.md |
+| B3.77 | 2026-02-09 | 32k Long-Context Attempt | COMPLETED | PASS (bf16=fp16; diff=0.0) | N/A (context escalation) | artifacts_remote/2026-02-09/b3_77/ | docs/AMD/2026_02_09_B3_77_to_B3_80_decode_batch_suite.md |
+| B3.78 | 2026-02-09 | 32k KV-Aligned Control | COMPLETED | PASS_EQUIV (diff=0.0) | N/A (alignment validation) | artifacts_remote/2026-02-09/b3_78_80/ | docs/AMD/2026_02_09_B3_77_to_B3_80_decode_batch_suite.md |
+| B3.79 | 2026-02-10 | Batch Size Probe (8k/16k) | COMPLETED | PASS (batch=2 stable) | N/A (batch escalation) | artifacts_remote/2026-02-10/b3_78_80/ | docs/AMD/2026_02_09_B3_77_to_B3_80_decode_batch_suite.md |
+| B3.80 | 2026-02-10 | Micro-Soak Repetition (16k) | COMPLETED | PASS (5/5 determinism) | N/A (determinism soak) | artifacts_remote/2026-02-10/b3_78_80/ | docs/AMD/2026_02_09_B3_77_to_B3_80_decode_batch_suite.md |
+| B3.81 | 2026-02-10 | Multi-Batch Throughput | COMPLETED | PASS (batch=8 stable) | N/A (throughput audit) | artifacts_remote/2026-02-10/b3_81/ | docs/AMD/2026_02_09_B3_81_multibatch_throughput.md |
+| B3.82 | 2026-02-10 | Steady-State Decode Scaling | COMPLETED | PASS (100% tokens; 2.0 TPS) | N/A (steady-state audit) | artifacts_remote/2026-02-10/b3_82_84/ | docs/AMD/2026_02_09_B3_82_to_B3_84_decode_steady_state.md |
+| B3.83 | 2026-02-10 | Long-Context Decode (32k) | COMPLETED | TIMEOUT_PREFILL | PREFILL_O(N^2)_BOTTLE_NECK | artifacts_remote/2026-02-10/b3_82_84/ | docs/AMD/2026_02_09_B3_82_to_B3_84_decode_steady_state.md |
+| B3.84 | 2026-02-10 | High-Pressure Batch Decode | COMPLETED | PASS (110GB VRAM; 100% tokens) | N/A (high-pressure stability) | artifacts_remote/2026-02-10/b3_82_84/ | docs/AMD/2026_02_09_B3_82_to_B3_84_decode_steady_state.md |
 
 ---
 

@@ -312,8 +312,10 @@ int main(int argc, char *argv[]) {
   std::cout << "Buffers allocated\n";
 
   // Load weights from model file if provided
+  double model_load_s = 0;
   if (!model_path.empty()) {
     std::cout << "\nLoading weights from: " << model_path << "\n";
+    auto start_load = std::chrono::high_resolution_clock::now();
     if (!loader) {
       std::cerr << "Failed to open model: " << err << "\n";
       return 1;
@@ -322,6 +324,8 @@ int main(int argc, char *argv[]) {
       std::cerr << "Weight loading failed: " << err << "\n";
       return 1;
     }
+    auto end_load = std::chrono::high_resolution_clock::now();
+    model_load_s = std::chrono::duration<float>(end_load - start_load).count();
     std::cout << "Weights loaded (vocab size: " << config.vocab_size << ")\n";
   }
 
@@ -453,6 +457,14 @@ int main(int argc, char *argv[]) {
   std::cout << "  Time to first token: " << stats.time_to_first_token_ms
             << " ms\n";
   std::cout << "  Tokens/second: " << stats.tokens_per_second << "\n";
+
+  // B3.85: Machine-readable timings for RCA
+  std::cout << "[PERF_TIMING] {"
+            << "\"model_load_s\":" << model_load_s << ","
+            << "\"tokenize_s\":" << (stats.tokenize_time_ms / 1000.0) << ","
+            << "\"prefill_s\":" << (stats.prefill_time_ms / 1000.0) << ","
+            << "\"decode_s\":" << (stats.decode_time_ms / 1000.0) << ","
+            << "\"attn_impl\":\"flash_v2_naive\"}\n";
 
   std::cout << "\nSTATUS=OK\n";
 

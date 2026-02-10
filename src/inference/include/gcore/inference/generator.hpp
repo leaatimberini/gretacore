@@ -29,6 +29,10 @@ struct GenerationStats {
   double total_time_ms = 0.0;
   double tokens_per_second = 0.0;
   double time_to_first_token_ms = 0.0;
+  // B3.85: Phase timings
+  double prefill_time_ms = 0.0;
+  double decode_time_ms = 0.0;
+  double tokenize_time_ms = 0.0;
 };
 
 /// Stats per generation step (for alignment/debugging).

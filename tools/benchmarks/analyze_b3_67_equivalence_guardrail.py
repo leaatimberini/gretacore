@@ -2358,6 +2358,117 @@ def run_b3_82_84_suite_analysis(traces_dir_str: str, output_path: str) -> int:
         json.dump(summary, f, indent=2)
     print(f"Summary written to: {summary_path}")
 
+def run_b3_85_analysis(traces_dir_str: str, output_path: str) -> int:
+    traces_dir = Path(traces_dir_str)
+    print(f"[B3.85] Loading prefill complexity runs from: {traces_dir}")
+    config, runs = load_b3_76_runs(traces_dir)
+    if not runs: return 1
+
+    runs.sort(key=lambda x: x.get('context_len', 0))
+    
+    with open(output_path, 'w') as f:
+        f.write("# B3.85 Prefill Complexity RCA Report\n\n")
+        f.write("| Context | Wall Time (s) | Prefill (s) | Tokenize (s) | Load (s) | Ratio Time/Prev | Verdict |\n")
+        f.write("|---|---|---|---|---|---|---|\n")
+        
+        last_t = None
+        last_c = None
+        for r in runs:
+            c = r.get('context_len', 0)
+            wall = r.get('wall_time_sec', 0)
+            t = r.get('timings', {}).get('prefill_s', 0)
+            tok = r.get('timings', {}).get('tokenize_s', 0)
+            ld = r.get('timings', {}).get('model_load_s', 0)
+            
+            ratio_str = "N/A"
+            verdict = "OK"
+            if last_t and last_t > 0 and last_c:
+                ratio = t / last_t
+                c_ratio = c / last_c
+                ratio_str = f"{ratio:.2f}x (c={c_ratio:.1f}x)"
+                # If T_ratio > c_ratio^2 * 1.5, we might have O(N^2+) or extreme overhead
+                if ratio > (c_ratio * c_ratio * 1.5):
+                    verdict = "WARN_EXP"
+            
+            f.write(f"| {c} | {wall:.2f} | {t:.3f} | {tok:.3f} | {ld:.2f} | {ratio_str} | {verdict} |\n")
+            last_t = t
+            last_c = c
+        
+        f.write("\n## Complexity Analysis\n")
+        f.write("- Perfect $O(N)$ scaling would show ratio = c_ratio\n")
+        f.write("- Perfect $O(N^2)$ scaling would show ratio = c_ratio^2 (e.g. 4x for 2x context)\n")
+        
+    print(f"Report written to: {output_path}")
+    return 0
+
+def run_b3_86_analysis(traces_dir_str: str, output_path: str) -> int:
+    traces_dir = Path(traces_dir_str)
+    print(f"[B3.86] Loading kernel probe runs from: {traces_dir}")
+    config, runs = load_b3_76_runs(traces_dir)
+    if not runs: return 1
+
+    with open(output_path, 'w') as f:
+        f.write("# B3.86 Attention Implementation Probe\n\n")
+        f.write("| Context | Requested Impl | Active Impl | Prefill Time (s) | VRAM (MB) |\n")
+        f.write("|---|---|---|---|---|\n")
+        for r in runs:
+            c = r.get('context_len', 0)
+            req = r.get('attn_impl_request', 'auto')
+            act = r.get('timings', {}).get('attn_impl', 'unknown')
+            t = r.get('timings', {}).get('prefill_s', 0)
+            v = r.get('peak_vram_mb', 0)
+            f.write(f"| {c} | {req} | {act} | {t:.3f} | {v:.0f} |\n")
+            
+    print(f"Report written to: {output_path}")
+    return 0
+
+def run_b3_87_analysis(traces_dir_str: str, output_path: str) -> int:
+    traces_dir = Path(traces_dir_str)
+    print(f"[B3.87] Loading decode RCA runs from: {traces_dir}")
+    config, runs = load_b3_76_runs(traces_dir)
+    if not runs: return 1
+
+    with open(output_path, 'w') as f:
+        f.write("# B3.87 Decode TPS Decomposition\n\n")
+        f.write("| Batch | Determinism | Tokens/s | Decode Time (s) | Load (s) | Overhead |\n")
+        f.write("|---|---|---|---|---|---|\n")
+        for r in runs:
+            b = r.get('batch', 1)
+            det = r.get('deterministic', 'off')
+            tps = r.get('tokens_per_sec', 0)
+            dec = r.get('timings', {}).get('decode_s', 0)
+            ld = r.get('timings', {}).get('model_load_s', 0)
+            overhead = r.get('wall_time_sec', 0) - dec - ld
+            f.write(f"| {b} | {det} | {tps:.2f} | {dec:.2f} | {ld:.2f} | {overhead:.2f} |\n")
+            
+    print(f"Report written to: {output_path}")
+    return 0
+
+def run_b3_88_analysis(traces_dir_str: str, output_path: str) -> int:
+    traces_dir = Path(traces_dir_str)
+    print(f"[B3.88] Loading 32k feasibility runs from: {traces_dir}")
+    config, runs = load_b3_76_runs(traces_dir)
+    if not runs: return 1
+
+    with open(output_path, 'w') as f:
+        f.write("# B3.88 32k Feasibility Milestone\n\n")
+        for r in runs:
+            c = r.get('context_len', 0)
+            st = r.get('exit_status', 'FAIL')
+            t = r.get('wall_time_sec', 0)
+            pref = r.get('timings', {}).get('prefill_s', 0)
+            f.write(f"### Result for CTX={c}\n")
+            f.write(f"- **Status:** {st}\n")
+            f.write(f"- **Wall Time:** {t:.2f} s\n")
+            f.write(f"- **Prefill Time:** {pref:.2f} s\n")
+            if st == "OK" and c == 32768:
+                f.write("\n**VERDICT: PASS** - 32k feasibility achieved!\n")
+            elif c == 32768:
+                f.write("\n**VERDICT: FAIL** - 32k mission incomplete.\n")
+                
+    print(f"Report written to: {output_path}")
+    return 0
+
     return 0 if global_verdict == 'PASS' else 1
 
 def main():
@@ -2374,8 +2485,8 @@ def main():
                         help='Expected seeds (comma-separated)')
     parser.add_argument('--kv-aligned', type=str, default='0,1',
                         help='Expected kv_aligned values (comma-separated)')
-    parser.add_argument('--mode', type=str, default='b3_67', choices=['b3_67', 'b3_69', 'b3_70_71_72', 'b3_73', 'b3_74', 'b3_75', 'b3_76', 'b3_77', 'b3_78_80', 'b3_81', 'b3_82_84'],
-                        help='Analysis mode: b3_67 (metadata), b3_69 (logits), b3_70+ (sweep), b3_73 (reconcile), b3_74 (internal), b3_75 (CI), b3_76 (pressure), b3_77 (32k), b3_78_80 (suite), b3_81 (batch), b3_82_84 (steady)')
+    parser.add_argument('--mode', type=str, default='b3_67', choices=['b3_67', 'b3_69', 'b3_70_71_72', 'b3_73', 'b3_74', 'b3_75', 'b3_76', 'b3_77', 'b3_78_80', 'b3_81', 'b3_82_84', 'b3_85', 'b3_86', 'b3_87', 'b3_88'],
+                        help='Analysis mode: b3_67 (metadata), b3_69 (logits), b3_70+ (sweep), b3_73 (reconcile), b3_74 (internal), b3_75 (CI), b3_76 (pressure), b3_77 (32k), b3_78_80 (suite), b3_81 (batch), b3_82_84 (steady), b3_85 (prefill_rca), b3_86 (attn_probe), b3_87 (decode_rca), b3_88 (32k_milestone)')
     
     args = parser.parse_args()
     
@@ -2413,6 +2524,22 @@ def main():
     # B3.82-84 steady mode
     if args.mode == 'b3_82_84':
         return run_b3_82_84_suite_analysis(args.traces_dir, args.output)
+
+    # B3.85 prefill complexity RCA
+    if args.mode == 'b3_85':
+        return run_b3_85_analysis(args.traces_dir, args.output)
+
+    # B3.86 attn implementation probe
+    if args.mode == 'b3_86':
+        return run_b3_86_analysis(args.traces_dir, args.output)
+
+    # B3.87 decode TPS decomposition
+    if args.mode == 'b3_87':
+        return run_b3_87_analysis(args.traces_dir, args.output)
+
+    # B3.88 32k feasibility milestone
+    if args.mode == 'b3_88':
+        return run_b3_88_analysis(args.traces_dir, args.output)
     
     # B3.74 internal audit mode
     if args.mode == 'b3_74':
