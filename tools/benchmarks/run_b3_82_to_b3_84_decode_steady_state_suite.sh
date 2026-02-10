@@ -31,12 +31,12 @@ SSH_OPTS="-o StrictHostKeyChecking=no -o ConnectTimeout=120"
 echo "=== B3.82-84 Steady-State Suite Runner (MI300X) ==="
 echo "[1/4] Preparing remote environment..."
 until scp $SSH_OPTS tools/benchmarks/remote_b3_82_84_executor.sh root@$HOST:/tmp/remote_b3_82_84_executor.sh; do
-    echo "SCP failed, retrying in 10s..."
-    sleep 10
+    echo "SCP failed, retrying in 30s..."
+    sleep 30
 done
 until ssh $SSH_OPTS root@$HOST "chmod +x /tmp/remote_b3_82_84_executor.sh"; do
-    echo "SSH chmod failed, retrying in 10s..."
-    sleep 10
+    echo "SSH chmod failed, retrying in 30s..."
+    sleep 30
 done
 
 echo "[2/4] Syncing and building on $HOST..."
@@ -48,26 +48,29 @@ until ssh $SSH_OPTS root@$HOST "
     cd tools/inference/build
     make -j\$(nproc)
 "; do
-    echo "Sync/Build failed, retrying in 10s..."
-    sleep 10
+    echo "Sync/Build failed, retrying in 60s..."
+    sleep 60
 done
 
 echo "[3/4] Executing Suite B3.82-84 (via nohup)..."
 until ssh $SSH_OPTS root@$HOST "nohup /tmp/remote_b3_82_84_executor.sh \"$DATE\" > /tmp/b3_82_84.log 2>&1 &"; do
-    echo "Failed to start remote script, retrying in 10s..."
-    sleep 10
+    echo "Failed to start remote script, retrying in 60s..."
+    sleep 60
 done
 echo "Remote suite started in background. Waiting for completion..."
 
 # Simple poll for completion
 until ssh $SSH_OPTS root@$HOST "grep -q 'DONE_REMOTE_B3_82_84' /tmp/b3_82_84.log" 2>/dev/null; do
     echo -n "."
-    # If SSH failed (exit code 255), just wait and retry
+    # If SSH failed (exit code 255), wait longer
     RET=$?
     if [ $RET -eq 255 ]; then
         echo -n "!"
+        sleep 120
+    else
+        # Successfull check but not done, wait 60s
+        sleep 60
     fi
-    sleep 30
 done
 echo " Suite finished."
 
