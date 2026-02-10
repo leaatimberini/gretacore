@@ -1,0 +1,52 @@
+{
+  "ticket": "B3.77",
+  "global_verdict": "PASS",
+  "config": {
+    "ticket": "B3.77",
+    "project": "32k Long-Context Attempt",
+    "date": "2026-02-09",
+    "host": "129.212.184.200",
+    "git_commit": "66dceb8",
+    "timestamp": "2026-02-10T01:03:10Z",
+    "timeout_policy": {
+      "prefill_timeout_sec": 600,
+      "decode_timeout_sec": 600
+    },
+    "matrix": {
+      "contexts": [
+        32768
+      ],
+      "kv_aligned": [
+        1
+      ],
+      "dtype": "bf16",
+      "seed": 0
+    }
+  },
+  "results": [
+    {
+      "context": 32768,
+      "kv": 1,
+      "verdict": "PASS_EQUIV",
+      "max_diff": 0.0,
+      "p99_diff": 0.0,
+      "top1": 1.0,
+      "peak_vram": 17095,
+      "gen_len": 64,
+      "dump_span": 16,
+      "prefill_time": 36.142657181,
+      "decode_time": 35.67718095,
+      "vram_meta": {
+        "peak_vram_mb": 17095,
+        "samples_count": 66,
+        "sampling_period_sec": 1,
+        "peak_timestamp_offset_sec": 34,
+        "device_info": "AMD MI300X",
+        "status": "OK",
+        "note": "1s sampling; micro-spikes might not be captured"
+      }
+    }
+  ],
+  "skips": [],
+  "timestamp": "2026-02-10T01:04:33.443786Z"
+}

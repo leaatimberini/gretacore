@@ -1847,9 +1847,10 @@ def run_b3_76_memory_pressure_analysis(traces_dir_str: str, output_path: str, ti
     # Group pairs
     pairs = defaultdict(dict)
     for r in runs:
-        # Key by (context, kv) since other params are fixed in B3.76 matrix
         key = (r['context_len'], r['kv_aligned'])
-        pairs[key][r['mode']] = r
+        mode = r.get('mode') or r.get('phase')
+        if mode:
+            pairs[key][mode] = r
 
     results = []
     global_verdict = 'PASS'
@@ -1863,14 +1864,22 @@ def run_b3_76_memory_pressure_analysis(traces_dir_str: str, output_path: str, ti
         context, kv = key
         row = {
             'context': context, 'kv': kv, 'verdict': 'INCOMPLETE',
-            'max_diff': None, 'p99_diff': None, 'top1': None, 'peak_vram': 0
+            'max_diff': None, 'p99_diff': None, 'top1': None, 
+            'peak_vram': 0, 'gen_len': None, 'dump_span': None,
+            'prefill_time': None, 'decode_time': None,
+            'vram_meta': {}
         }
         
         if 'prefill' in modes and 'decode' in modes:
             p_run = modes['prefill']
             d_run = modes['decode']
             
+            row['gen_len'] = p_run.get('gen_len')
+            row['dump_span'] = p_run.get('dump_span')
+            row['prefill_time'] = p_run.get('wall_time_sec')
+            row['decode_time'] = d_run.get('wall_time_sec')
             row['peak_vram'] = p_run.get('vram', {}).get('peak_vram_mb', 0)
+            row['vram_meta'] = p_run.get('vram', {})
             
             if p_run['_logits'] and d_run['_logits'] and os.path.exists(p_run['_logits']) and os.path.exists(d_run['_logits']):
                 metrics = compute_logits_diff(p_run['_logits'], d_run['_logits'])
@@ -1904,15 +1913,33 @@ def run_b3_76_memory_pressure_analysis(traces_dir_str: str, output_path: str, ti
         f.write(f"# {ticket} Long-Context Report\n\n")
         f.write(f"**Global Verdict:** {global_verdict}\n\n")
         
-        f.write("## Context Matrix & VRAM\n\n")
-        f.write("| Context | KV | Peak VRAM (MB) | Max Diff | P99 Diff | Top1 | Verdict |\n")
-        f.write("|---|---|---|---|---|---|---|\n")
+        f.write("## Context Matrix & Performance\n\n")
+        f.write("| Context | Gen | Span | KV | Peak VRAM (MB) | Prefill (s) | Decode (s) | Max Diff | Top1 | Verdict |\n")
+        f.write("|---|---|---|---|---|---|---|---|---|---|\n")
         for r in results:
             max_d = f"{r['max_diff']:.6f}" if r['max_diff'] is not None else "N/A"
-            p99_d = f"{r['p99_diff']:.6f}" if r['p99_diff'] is not None else "N/A"
             top1 = f"{r['top1']:.4f}" if r['top1'] is not None else "N/A"
-            f.write(f"| {r['context']} | {r['kv']} | {r['peak_vram']} | {max_d} | {p99_d} | {top1} | {r['verdict']} |\n")
+            p_time = f"{r['prefill_time']:.2f}" if r['prefill_time'] is not None else "N/A"
+            d_time = f"{r['decode_time']:.2f}" if r['decode_time'] is not None else "N/A"
+            f.write(f"| {r['context']} | {r['gen_len']} | {r['dump_span']} | {r['kv']} | {r['peak_vram']} | {p_time} | {d_time} | {max_d} | {top1} | {r['verdict']} |\n")
         
+        if ticket == 'B3.77':
+            f.write("\n## Timeout Policy & Timing\n\n")
+            tp = config.get('timeout_policy', {})
+            f.write(f"- **Prefill Timeout:** {tp.get('prefill_timeout_sec', 'N/A')}s\n")
+            f.write(f"- **Decode Timeout:** {tp.get('decode_timeout_sec', 'N/A')}s\n")
+            
+            f.write("\n## VRAM Sampling Method\n\n")
+            for r in results:
+                vm = r.get('vram_meta', {})
+                if vm:
+                    f.write(f"- **Device:** {vm.get('device_info', 'N/A')}\n")
+                    f.write(f"- **Sampling Period:** {vm.get('sampling_period_sec', 'N/A')}s\n")
+                    f.write(f"- **Samples Count:** {vm.get('samples_count', 'N/A')}\n")
+                    f.write(f"- **Peak Offset:** {vm.get('peak_timestamp_offset_sec', 'N/A')}s\n")
+                    f.write(f"- **Note:** {vm.get('note', 'N/A')}\n")
+                    break # Single point
+
         if skips:
             f.write("\n## Skips/Failures\n\n")
             for s in skips:
@@ -1924,13 +1951,17 @@ def run_b3_76_memory_pressure_analysis(traces_dir_str: str, output_path: str, ti
     summary = {
         'ticket': ticket,
         'global_verdict': global_verdict,
+        'config': config,
         'results': results,
-        'skips': skips
+        'skips': skips,
+        'timestamp': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
     }
-    with open(Path(output_path).parent / "summary.json", 'w') as f:
+    summary_path = Path(output_path).parent / "summary.json"
+    with open(summary_path, 'w') as f:
         json.dump(summary, f, indent=2)
-
-    return 1 if global_verdict != 'PASS' else 0
+    print(f"Summary written to: {summary_path}")
+    
+    return 0 if global_verdict == 'PASS' or global_verdict == 'PASS_EQUIV' else 1
 
 def main():
     parser = argparse.ArgumentParser(description='B3.67 Equivalence Guardrail Analyzer')
