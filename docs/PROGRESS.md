@@ -69,14 +69,18 @@
     - [x] Engine: Add phase timings (tokenize, prefill, decode)
     - [x] Runner: Implement escalation (4k-32k)
     - [x] Analyzer: Aggregate timings, fit scaling law
+    - [!] Status: INFRASTRUCTURE_READY; Awaiting remote execution stability
 - [x] **B3.86 — Prefill Kernel Switch Probe** (MI300X)
     - [x] Engine: Detection logging for active attn impl
     - [x] Runner: Test impl variants
+    - [!] Status: INFRASTRUCTURE_READY
 - [x] **B3.87 — Decode TPS Decomposition** (MI300X)
     - [x] Runner: Test determinism flags impact
     - [x] Analyzer: Separate compute vs overhead
+    - [x] Status: COMPLETED (partial results in artifacts_remote/2026-02-10/b3_87)
 - [x] **B3.88 — 32k Feasibility Milestone** (MI300X)
     - [x] Runner: Target 32k prefill
+    - [!] Status: INFRASTRUCTURE_READY
 - B3.74 internal audit: `f31ab1c`
 - Docs index: `1f662f1`
 
@@ -112,6 +116,10 @@
 | B3.82 | 2026-02-10 | Steady-State Decode Scaling | COMPLETED | PASS (100% tokens; 2.0 TPS) | N/A (steady-state audit) | artifacts_remote/2026-02-10/b3_82_84/ | docs/AMD/2026_02_09_B3_82_to_B3_84_decode_steady_state.md |
 | B3.83 | 2026-02-10 | Long-Context Decode (32k) | COMPLETED | TIMEOUT_PREFILL | PREFILL_O(N^2)_BOTTLE_NECK | artifacts_remote/2026-02-10/b3_82_84/ | docs/AMD/2026_02_09_B3_82_to_B3_84_decode_steady_state.md |
 | B3.84 | 2026-02-10 | High-Pressure Batch Decode | COMPLETED | PASS (110GB VRAM; 100% tokens) | N/A (high-pressure stability) | artifacts_remote/2026-02-10/b3_82_84/ | docs/AMD/2026_02_09_B3_82_to_B3_84_decode_steady_state.md |
+| B3.85 | 2026-02-10 | Prefill Complexity RCA | IN_PROGRESS | READY | TBD | artifacts_remote/2026-02-10/b3_85/ | docs/AMD/2026_02_10_B3_85_prefill_complexity_rca.md |
+| B3.86 | 2026-02-10 | Attn Impl Probe | IN_PROGRESS | READY | TBD | artifacts_remote/2026-02-10/b3_86/ | docs/AMD/2026_02_10_B3_86_attn_impl_probe.md |
+| B3.87 | 2026-02-10 | Decode TPS Decomposition | COMPLETED | PASS (analyzed) | N/A | artifacts_remote/2026-02-10/b3_87/ | docs/AMD/2026_02_10_B3_87_decode_tps_decomposition.md |
+| B3.88 | 2026-02-10 | 32k Feasibility | IN_PROGRESS | READY | TBD | artifacts_remote/2026-02-10/b3_88/ | docs/AMD/2026_02_10_B3_88_32k_feasibility.md |
 
 ---
 
