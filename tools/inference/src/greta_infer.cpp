@@ -382,14 +382,21 @@ int main(int argc, char *argv[]) {
 
   gcore::inference::AlignmentCallback align_cb = nullptr;
 
+  if (exec_mode == "prefill") {
+    params.max_tokens = 1; // Only sample the first token, don't enter loop
+  }
+
   // B3.69: If dumping logits, capture them via alignment callback
-  if (!dump_logits_dir.empty()) {
-    align_cb = [&captured_logits, dump_logits_span](const gcore::inference::AlignmentStep &step) {
-      if (dump_logits_span > 0 && captured_logits.size() < (size_t)dump_logits_span) {
+  // B3.82: Only enable the callback if dump_logits_span > 0 to avoid
+  // performance bottleneck in generator
+  if (!dump_logits_dir.empty() && dump_logits_span > 0) {
+    align_cb = [&captured_logits,
+                dump_logits_span](const gcore::inference::AlignmentStep &step) {
+      if (captured_logits.size() < (size_t)dump_logits_span) {
         CapturedLogit entry;
         entry.step = step.step;
         entry.token_id = step.token_id;
-        entry.logits = step.full_logits; // Captured from generator
+        entry.logits = step.full_logits;
         captured_logits.push_back(std::move(entry));
       }
     };
@@ -413,20 +420,33 @@ int main(int argc, char *argv[]) {
   gcore::inference::GenerationStats stats;
   std::string output = generator.generate(
       prompt, params, &stats,
-      [&captured_tokens, &stats](int32_t id, const std::string &text) {
-        CapturedToken t;
-        // stats.prompt_tokens is filled after generate, so we use a counter or
-        // adjust later.
-        // Actually TokenCallback is called AFTER generate_tokens loop in
-        // Generator::generate. So stats is already filled.
-        t.token_idx = (uint32_t)(stats.prompt_tokens + captured_tokens.size());
-        t.token_id = id;
-        captured_tokens.push_back(t);
+      [&captured_tokens, &stats, &dump_logits_dir](int32_t id,
+                                                   const std::string &text) {
+        // Collect token stream ONLY if dump_logits_dir is set (for
+        // verification)
+        if (!dump_logits_dir.empty()) {
+          CapturedToken t;
+          t.token_idx =
+              (uint32_t)(stats.prompt_tokens + captured_tokens.size());
+          t.token_id = id;
+          captured_tokens.push_back(t);
+        }
       },
       align_cb);
 
-  std::cout << "Prompt: " << prompt << "\n";
-  std::cout << "Generated: " << output << "\n\n";
+  // Avoid printing massive prompts/outputs to stdout during long context
+  // benchmarks
+  if (prompt.length() < 1000) {
+    std::cout << "Prompt: " << prompt << "\n";
+  } else {
+    std::cout << "Prompt: <" << prompt.length() << " chars>\n";
+  }
+
+  if (output.length() < 1000) {
+    std::cout << "Generated: " << output << "\n\n";
+  } else {
+    std::cout << "Generated: <" << output.length() << " chars>\n\n";
+  }
   std::cout << "═══════════════════════════════════════════════════════════\n";
 
   // Print stats
@@ -513,8 +533,8 @@ int main(int argc, char *argv[]) {
     if (gzt) {
       for (const auto &t : captured_tokens) {
         std::ostringstream line;
-        line << "{\"token_idx\":" << t.token_idx << ",\"token_id\":" << t.token_id
-             << "}\n";
+        line << "{\"token_idx\":" << t.token_idx
+             << ",\"token_id\":" << t.token_id << "}\n";
         std::string s = line.str();
         gzwrite(gzt, s.c_str(), (unsigned int)s.size());
       }
