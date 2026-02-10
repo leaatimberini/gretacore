@@ -1867,6 +1867,7 @@ def run_b3_76_memory_pressure_analysis(traces_dir_str: str, output_path: str, ti
             'max_diff': None, 'p99_diff': None, 'top1': None, 
             'peak_vram': 0, 'gen_len': None, 'dump_span': None,
             'prefill_time': None, 'decode_time': None,
+            'prefill_path': None, 'decode_path': None,
             'vram_meta': {}
         }
         
@@ -1878,6 +1879,8 @@ def run_b3_76_memory_pressure_analysis(traces_dir_str: str, output_path: str, ti
             row['dump_span'] = p_run.get('dump_span')
             row['prefill_time'] = p_run.get('wall_time_sec')
             row['decode_time'] = d_run.get('wall_time_sec')
+            row['prefill_path'] = p_run.get('_path')
+            row['decode_path'] = d_run.get('_path')
             row['peak_vram'] = p_run.get('vram', {}).get('peak_vram_mb', 0)
             row['vram_meta'] = p_run.get('vram', {})
             
@@ -1947,10 +1950,35 @@ def run_b3_76_memory_pressure_analysis(traces_dir_str: str, output_path: str, ti
 
     print(f"Report written to: {output_path}")
     
+    # Aggregate stats for audit-ready summary
+    pass_equiv_count = sum(1 for r in results if r['verdict'] == 'PASS_EQUIV')
+    fail_equiv_count = sum(1 for r in results if r['verdict'] == 'FAIL_EQUIV')
+    
+    # Root level summaries (for single point or average)
+    perf_summary = {}
+    vram_summary = {}
+    if results:
+        # For B3.77 it's a single point, so we just take the first entry
+        r0 = results[0]
+        perf_summary = {
+            'prefill_wall_time_sec': r0['prefill_time'],
+            'decode_wall_time_sec': r0['decode_time']
+        }
+        vram_summary = r0.get('vram_meta', {})
+
     # JSON Summary
     summary = {
         'ticket': ticket,
         'global_verdict': global_verdict,
+        'run_count_total': len(results) * 2,
+        'pair_count_total': len(results),
+        'verdict_counts_pairs': {
+            'pass_equiv': pass_equiv_count,
+            'fail_equiv': fail_equiv_count
+        },
+        'timeout_policy': config.get('timeout_policy', {}),
+        'perf': perf_summary,
+        'vram': vram_summary,
         'config': config,
         'results': results,
         'skips': skips,
