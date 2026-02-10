@@ -45,7 +45,9 @@ until ssh $SSH_OPTS root@$HOST "
     cd $REMOTE_BASE
     git fetch origin
     git reset --hard origin/main
+    mkdir -p tools/inference/build
     cd tools/inference/build
+    cmake .. -DCMAKE_BUILD_TYPE=Release
     make -j\$(nproc)
 "; do
     echo "Sync/Build failed, retrying in 60s..."
