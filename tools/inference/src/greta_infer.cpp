@@ -382,10 +382,6 @@ int main(int argc, char *argv[]) {
 
   gcore::inference::AlignmentCallback align_cb = nullptr;
 
-  if (exec_mode == "prefill") {
-    params.max_tokens = 1; // Only sample the first token, don't enter loop
-  }
-
   // B3.69: If dumping logits, capture them via alignment callback
   // B3.82: Only enable the callback if dump_logits_span > 0 to avoid
   // performance bottleneck in generator

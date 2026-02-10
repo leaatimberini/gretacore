@@ -11,7 +11,7 @@ cd "$REMOTE_BASE"
 KV_ALIGNED=1
 SEED=0
 DTYPE="bf16"
-TIMEOUT_SEC=900
+TIMEOUT_SEC=2400
 SAMPLING_PERIOD=1
 
 run_config() {
@@ -52,9 +52,10 @@ run_config() {
         local MODE_OUT="$TARGET_OUT/$MODE"
         mkdir -p "$MODE_OUT"
 
-        export HIP_LAUNCH_BLOCKING=1
-        export AMD_SERIALIZE_KERNEL=3
-        export HSA_ENABLE_SDMA=0
+        # Performance settings
+        # export HIP_LAUNCH_BLOCKING=1
+        # export AMD_SERIALIZE_KERNEL=3
+        # export HSA_ENABLE_SDMA=0
         export GRETA_DETERMINISTIC=1
         export GRETA_SEED=$SEED
         export GRETA_MAX_SEQ_LEN=$((ctx + gen + 128))
