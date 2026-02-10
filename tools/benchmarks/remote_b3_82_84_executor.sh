@@ -30,7 +30,7 @@ run_config() {
     local PROMPT_FILE="$REMOTE_BASE/tools/benchmarks/prompts/synthetic_${ctx}.txt"
     if [ ! -f "$PROMPT_FILE" ]; then
         mkdir -p "$(dirname "$PROMPT_FILE")"
-        python3 -c "print('hello ' * $ctx)" > "$PROMPT_FILE"
+        python3 -c "print('h' * $ctx)" > "$PROMPT_FILE"
     fi
 
     local VRAM_FILE="$TARGET_OUT/vram_samples.csv"
@@ -64,6 +64,7 @@ run_config() {
         timeout --foreground "${TIMEOUT_SEC}s" ./tools/inference/build/greta_infer \
             --model ./models/greta-v1.gguf \
             --prompt-file "$PROMPT_FILE" \
+            --demo-tokenizer \
             --seed $SEED \
             --kv-aligned $KV_ALIGNED \
             --mode "$MODE" \
