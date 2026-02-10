@@ -15,7 +15,7 @@ TARGET_OUT="$RUN_ROOT/$REL_PATH"
 mkdir -p "$TARGET_OUT"
 
 echo "[B3.88] Attempting 32k prefill (Timeout 1h)..."
-python3 -c "print('hello ' * 16384)" > /tmp/prompt.txt
+python3 -c "print('a' * 32767)" > /tmp/prompt.txt
 
 export GRETA_VERBOSE_INFO=1
 export GRETA_MAX_SEQ_LEN=65536

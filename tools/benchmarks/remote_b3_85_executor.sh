@@ -22,10 +22,9 @@ run_config() {
 
     echo "[B3.85] Running CTX=$ctx, Timeout=${timeout}s..."
     
-    # Generate a prompt. We use a shorter string repeated to avoid exploding character count
-    # if the tokenizer is inefficient.
+    # Generate a prompt. In ASCII fallback mode (char-wise), we want exactly ctx-1 chars.
     local PROMPT_FILE="/tmp/prompt_${ctx}.txt"
-    python3 -c "print('hello ' * ($ctx // 2))" > "$PROMPT_FILE"
+    python3 -c "print('a' * ($ctx - 1))" > "$PROMPT_FILE"
 
     export GRETA_KV_ALIGNED=1
     export GRETA_SEED=0

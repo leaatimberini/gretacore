@@ -16,7 +16,7 @@ run_config() {
     mkdir -p "$TARGET_OUT"
 
     echo "[B3.86] CTX=$ctx, IMPL=$impl ($variant_name)..."
-    python3 -c "print('test ' * ($ctx // 2))" > /tmp/prompt.txt
+    python3 -c "print('a' * ($ctx - 1))" > /tmp/prompt.txt
 
     # Setup environment for the specific impl if needed
     # (Currently we only have one, but we can fake/test flags)
