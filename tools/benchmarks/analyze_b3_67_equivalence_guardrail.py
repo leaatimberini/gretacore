@@ -1829,6 +1829,126 @@ def load_b3_76_runs(traces_dir: Path):
             
     return config, runs
 
+def run_b3_78_80_suite_analysis(traces_dir_str: str, output_path: str) -> int:
+    traces_dir = Path(traces_dir_str)
+    print(f"[B3.78-80] Loading suite runs from: {traces_dir}")
+    
+    config, runs = load_b3_76_runs(traces_dir)
+    if config is None:
+        print(f"[ERROR] No config.json found in {traces_dir}")
+        return 1
+
+    # Group runs into pairs by their specific dimensions
+    # Dimension keys: (ticket, context, kv, batch, repeat_idx)
+    pairs = defaultdict(dict)
+    for r in runs:
+        ticket = r.get('ticket', 'unknown')
+        ctx = r['context_len']
+        kv = r['kv_aligned']
+        batch = r['batch']
+        repeat = r.get('repeat_idx', 0)
+        mode = r.get('phase') or r.get('mode')
+        
+        key = (ticket, ctx, kv, batch, repeat)
+        if mode:
+            pairs[key][mode] = r
+
+    results = []
+    global_verdict = 'PASS'
+    
+    THRESH_P99 = 1e-3
+    THRESH_MAX = 5e-3
+    THRESH_TOP1 = 0.999
+
+    for key, modes in sorted(pairs.items()):
+        ticket, ctx, kv, batch, repeat = key
+        row = {
+            'ticket': ticket, 'context': ctx, 'kv': kv, 'batch': batch, 'repeat': repeat,
+            'verdict': 'INCOMPLETE', 'max_diff': None, 'top1': None, 
+            'peak_vram': 0, 'prefill_time': None, 'decode_time': None,
+            'prefill_path': None, 'decode_path': None,
+            'vram_meta': {}
+        }
+        
+        if 'prefill' in modes and 'decode' in modes:
+            p_run = modes['prefill']
+            d_run = modes['decode']
+            
+            row['prefill_time'] = p_run.get('wall_time_sec')
+            row['decode_time'] = d_run.get('wall_time_sec')
+            row['prefill_path'] = p_run.get('_path')
+            row['decode_path'] = d_run.get('_path')
+            row['peak_vram'] = p_run.get('vram', {}).get('peak_vram_mb', 0)
+            row['vram_meta'] = p_run.get('vram', {})
+            
+            # Skip equivalence check for skipped/failed runs
+            if p_run.get('exit_status', 'OK') == 'OK' and d_run.get('exit_status', 'OK') == 'OK':
+                if p_run['_logits'] and d_run['_logits'] and os.path.exists(p_run['_logits']) and os.path.exists(d_run['_logits']):
+                    metrics = compute_logits_diff(p_run['_logits'], d_run['_logits'])
+                    if metrics.get('status') == 'OK':
+                        row['max_diff'] = metrics['max_abs_diff']
+                        row['top1'] = metrics['top1_agreement']
+                        
+                        if kv == 1:
+                            if (metrics['p99_abs_diff'] <= THRESH_P99 and row['max_diff'] <= THRESH_MAX and row['top1'] >= THRESH_TOP1):
+                                row['verdict'] = 'PASS_EQUIV'
+                            else:
+                                row['verdict'] = 'FAIL_EQUIV'
+                                global_verdict = 'FAIL'
+                        else:
+                            row['verdict'] = 'EXPECTED_DRIFT'
+                    else:
+                        row['verdict'] = 'ERROR_LOGITS'
+                        global_verdict = 'FAIL'
+                else:
+                    row['verdict'] = 'MISSING_LOGITS'
+                    global_verdict = 'FAIL'
+            else:
+                st = p_run.get('exit_status', 'FAIL_ERROR')
+                row['verdict'] = st
+                if st != "SKIPPED_UNSUPPORTED_BATCH":
+                    global_verdict = 'FAIL'
+
+        results.append(row)
+
+    # Markdown Report
+    with open(output_path, 'w') as f:
+        f.write("# B3.78-80 Suite Analysis Report\n\n")
+        f.write(f"**Global Verdict:** {global_verdict}\n\n")
+        
+        for ticket_id in ['b3_78', 'b3_79', 'b3_80']:
+            ticket_results = [r for r in results if r['ticket'] == ticket_id]
+            if not ticket_results: continue
+            
+            f.write(f"## {ticket_id.upper()} Results\n\n")
+            f.write("| Context | Batch | KV | Repeat | Peak VRAM | Prefill (s) | Decode (s) | Max Diff | Top1 | Verdict |\n")
+            f.write("|---|---|---|---|---|---|---|---|---|---|\n")
+            for r in ticket_results:
+                max_d = f"{r['max_diff']:.6f}" if r['max_diff'] is not None else "N/A"
+                top1 = f"{r['top1']:.4f}" if r['top1'] is not None else "N/A"
+                p_t = f"{r['prefill_time']:.2f}" if r['prefill_time'] is not None else "N/A"
+                d_t = f"{r['decode_time']:.2f}" if r['decode_time'] is not None else "N/A"
+                f.write(f"| {r['context']} | {r['batch']} | {r['kv']} | {r['repeat']} | {r['peak_vram']} | {p_t} | {d_t} | {max_d} | {top1} | {r['verdict']} |\n")
+            f.write("\n")
+
+    print(f"Report written to: {output_path}")
+
+    # JSON Summary
+    summary = {
+        'suite': "B3.78-80",
+        'global_verdict': global_verdict,
+        'config': config,
+        'results': results,
+        'timestamp': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+    }
+    summary_path = Path(output_path).parent / "summary.json"
+    with open(summary_path, 'w') as f:
+        json.dump(summary, f, indent=2)
+    print(f"Summary written to: {summary_path}")
+
+    return 0 if global_verdict in ['PASS', 'PASS_EQUIV'] else 1
+
+
 def run_b3_76_memory_pressure_analysis(traces_dir_str: str, output_path: str, ticket: str = 'B3.76') -> int:
     traces_dir = Path(traces_dir_str)
     print(f"[{ticket}] Loading runs from: {traces_dir}")
@@ -2005,8 +2125,8 @@ def main():
                         help='Expected seeds (comma-separated)')
     parser.add_argument('--kv-aligned', type=str, default='0,1',
                         help='Expected kv_aligned values (comma-separated)')
-    parser.add_argument('--mode', type=str, default='b3_67', choices=['b3_67', 'b3_69', 'b3_70_71_72', 'b3_73', 'b3_74', 'b3_75', 'b3_76', 'b3_77'],
-                        help='Analysis mode: b3_67 (metadata), b3_69 (logits), b3_70+ (sweep), b3_73 (reconcile), b3_74 (internal), b3_75 (CI), b3_76 (pressure), b3_77 (32k)')
+    parser.add_argument('--mode', type=str, default='b3_67', choices=['b3_67', 'b3_69', 'b3_70_71_72', 'b3_73', 'b3_74', 'b3_75', 'b3_76', 'b3_77', 'b3_78_80'],
+                        help='Analysis mode: b3_67 (metadata), b3_69 (logits), b3_70+ (sweep), b3_73 (reconcile), b3_74 (internal), b3_75 (CI), b3_76 (pressure), b3_77 (32k), b3_78_80 (suite)')
     
     args = parser.parse_args()
     
@@ -2032,6 +2152,10 @@ def main():
     # B3.73 reconciliation mode: use dedicated analysis path
     if args.mode == 'b3_73':
         return run_b3_73_analysis(args.traces_dir, args.output)
+
+    # B3.78-80 suite mode
+    if args.mode == 'b3_78_80':
+        return run_b3_78_80_suite_analysis(args.traces_dir, args.output)
     
     # B3.74 internal audit mode
     if args.mode == 'b3_74':

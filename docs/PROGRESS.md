@@ -17,6 +17,9 @@
 **B3.75**: COMPLETED - MI300X CI Suite (PASS_BENCHMARK; Nightly 64/64, Stress 4/4, Coverage 64/64; 100% Equivalence)
 **B3.76**: COMPLETED - Long-Context Memory Pressure (PASS; up to 16k context; peak VRAM 49GB/MI300X)
 **B3.77**: COMPLETED - 32k Long-Context Attempt (PASS; bit-perfect at 32k context; peak VRAM 17.1GB/MI300X; sampling 1s)
+**B3.78**: IN_PROGRESS - 32k KV-Aligned Control
+**B3.79**: IN_PROGRESS - Batch Size Probe (8k/16k)
+**B3.80**: IN_PROGRESS - Micro-Soak Repetition (16k)
 
 ---
 
@@ -37,6 +40,9 @@
 **B3.75**: COMPLETED - MI300X CI Suite (PASS_BENCHMARK; Nightly 64/64, Stress 4/4, Coverage 64/64; 100% Equivalence)
 **B3.76**: COMPLETED - Long-Context Memory Pressure (PASS; up to 16k context; peak VRAM 49GB/MI300X)
 **B3.77**: COMPLETED - 32k Long-Context Attempt (PASS; bit-perfect at 32k context; peak VRAM 17.1GB/MI300X; sampling 1s)
+**B3.78**: IN_PROGRESS - 32k KV-Aligned Control
+**B3.79**: IN_PROGRESS - Batch Size Probe (8k/16k)
+**B3.80**: IN_PROGRESS - Micro-Soak Repetition (16k)
 
 ---
 
