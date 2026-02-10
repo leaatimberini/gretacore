@@ -141,8 +141,6 @@ int main(int argc, char *argv[]) {
   if (!dump_logits_dir.empty()) {
     std::cout << "  Dump Logits: " << dump_logits_dir << "\n";
     std::cout << "  Dump Span: " << dump_logits_span << "\n";
-    // B3.69: Override max_tokens to match dump span
-    params.max_tokens = dump_logits_span;
   }
 
   const char *verbose_info = std::getenv("GRETA_VERBOSE_INFO");
@@ -370,24 +368,30 @@ int main(int argc, char *argv[]) {
   std::cout << "═══════════════════════════════════════════════════════════\n";
   std::cout << "Generating...\n\n";
 
-  // B3.69: Captured logits for dump
   struct CapturedLogit {
     uint32_t step;
     int32_t token_id;
     std::vector<float> logits;
   };
+  struct CapturedToken {
+    uint32_t token_idx;
+    int32_t token_id;
+  };
   std::vector<CapturedLogit> captured_logits;
+  std::vector<CapturedToken> captured_tokens;
 
   gcore::inference::AlignmentCallback align_cb = nullptr;
 
   // B3.69: If dumping logits, capture them via alignment callback
   if (!dump_logits_dir.empty()) {
-    align_cb = [&captured_logits](const gcore::inference::AlignmentStep &step) {
-      CapturedLogit entry;
-      entry.step = step.step;
-      entry.token_id = step.token_id;
-      entry.logits = step.full_logits; // Captured from generator
-      captured_logits.push_back(std::move(entry));
+    align_cb = [&captured_logits, dump_logits_span](const gcore::inference::AlignmentStep &step) {
+      if (dump_logits_span > 0 && captured_logits.size() < (size_t)dump_logits_span) {
+        CapturedLogit entry;
+        entry.step = step.step;
+        entry.token_id = step.token_id;
+        entry.logits = step.full_logits; // Captured from generator
+        captured_logits.push_back(std::move(entry));
+      }
     };
   } else if (enable_alignment) {
     align_cb = [](const gcore::inference::AlignmentStep &step) {
@@ -408,7 +412,17 @@ int main(int argc, char *argv[]) {
 
   gcore::inference::GenerationStats stats;
   std::string output = generator.generate(
-      prompt, params, &stats, [](int32_t id, const std::string &text) {},
+      prompt, params, &stats,
+      [&captured_tokens, &stats](int32_t id, const std::string &text) {
+        CapturedToken t;
+        // stats.prompt_tokens is filled after generate, so we use a counter or
+        // adjust later.
+        // Actually TokenCallback is called AFTER generate_tokens loop in
+        // Generator::generate. So stats is already filled.
+        t.token_idx = (uint32_t)(stats.prompt_tokens + captured_tokens.size());
+        t.token_id = id;
+        captured_tokens.push_back(t);
+      },
       align_cb);
 
   std::cout << "Prompt: " << prompt << "\n";
@@ -489,8 +503,26 @@ int main(int argc, char *argv[]) {
       gzclose(gz);
       std::cout << "[B3.69] Wrote logits (" << captured_logits.size()
                 << " entries) to: " << logits_path << "\n";
-    } else {
+    } else if (dump_logits_span > 0) {
       std::cerr << "[B3.69] ERROR: Could not write " << logits_path << "\n";
+    }
+
+    // B3.82: Write tokens.jsonl.gz (full sequence token IDs)
+    std::string tokens_path = dump_logits_dir + "/tokens.jsonl.gz";
+    gzFile gzt = gzopen(tokens_path.c_str(), "wb");
+    if (gzt) {
+      for (const auto &t : captured_tokens) {
+        std::ostringstream line;
+        line << "{\"token_idx\":" << t.token_idx << ",\"token_id\":" << t.token_id
+             << "}\n";
+        std::string s = line.str();
+        gzwrite(gzt, s.c_str(), (unsigned int)s.size());
+      }
+      gzclose(gzt);
+      std::cout << "[B3.82] Wrote tokens (" << captured_tokens.size()
+                << " entries) to: " << tokens_path << "\n";
+    } else {
+      std::cerr << "[B3.82] ERROR: Could not write " << tokens_path << "\n";
     }
   }
 

@@ -21,6 +21,9 @@
 **B3.79**: COMPLETED - Batch Size Probe (8k/16k) (PASS; batch=2 stable)
 **B3.80**: COMPLETED - Micro-Soak Repetition (16k) (PASS; 5/5 determinism)
 **B3.81**: COMPLETED - Multi-Batch Throughput Scaling (8k) (PASS; batch=8 stable; bit-perfect)
+**B3.82**: IN_PROGRESS - Steady-State Decode Scaling (8k)
+**B3.83**: IN_PROGRESS - Long-Context Decode (32k)
+**B3.84**: IN_PROGRESS - High-Pressure Batch Decode (16k)
 
 ---
 

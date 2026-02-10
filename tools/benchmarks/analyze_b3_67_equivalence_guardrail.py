@@ -1815,6 +1815,7 @@ def load_b3_76_runs(traces_dir: Path):
             # Attach paths
             perf['_path'] = str(run_dir)
             perf['_logits'] = str(run_dir / "logits.jsonl.gz")
+            perf['_tokens'] = str(run_dir / "tokens.jsonl.gz")
             perf['_metadata'] = str(run_dir / "metadata.json")
             
             # vram.json is peer to mode dirs
@@ -2204,7 +2205,7 @@ def run_b3_81_throughput_analysis(traces_dir_str: str, output_path: str) -> int:
             max_d = f"{r['max_diff']:.6f}" if r['max_diff'] is not None else "N/A"
             p_t = f"{r['prefill_time']:.2f}" if r['prefill_time'] is not None else "N/A"
             d_t = f"{r['decode_time']:.2f}" if r['decode_time'] is not None else "N/A"
-            speedup = f"{s['speedup']:.2fx}"
+            speedup = f"{s['speedup']:.2f}x"
             vram_delta = f"{s['vram_delta_mb']:+d} MB"
             f.write(f"| {r['batch']} | {r['peak_vram']} | {p_t} | {d_t} | {r['tokens_per_sec']} | {speedup} | {vram_delta} | {r['verdict']} |\n")
 
@@ -2226,6 +2227,139 @@ def run_b3_81_throughput_analysis(traces_dir_str: str, output_path: str) -> int:
 
     return 0 if global_verdict in ['PASS', 'PASS_EQUIV'] else 1
 
+def compute_token_agreement(path_a: str, path_b: str) -> float:
+    """Compare two token ID streams from tokens.jsonl.gz."""
+    if not os.path.exists(path_a) or not os.path.exists(path_b):
+        return 0.0
+    
+    def load_tokens(p):
+        tokens = []
+        try:
+            with gzip.open(p, 'rt') as f:
+                for line in f:
+                    d = json.loads(line)
+                    tokens.append(d['token_id'])
+        except Exception:
+            pass
+        return tokens
+
+    toks_a = load_tokens(path_a)
+    toks_b = load_tokens(path_b)
+    
+    if not toks_a or not toks_b or len(toks_a) != len(toks_b):
+        return 0.0
+    
+    matches = sum(1 for a, b in zip(toks_a, toks_b) if a == b)
+    return matches / len(toks_a)
+
+def run_b3_82_84_suite_analysis(traces_dir_str: str, output_path: str) -> int:
+    traces_dir = Path(traces_dir_str)
+    print(f"[B3.82-84] Loading suite runs from: {traces_dir}")
+    
+    config, runs = load_b3_76_runs(traces_dir)
+    if config is None:
+        print(f"[ERROR] No config.json found in {traces_dir}")
+        return 1
+
+    # Group runs into pairs by (ticket, context, batch)
+    pairs = defaultdict(dict)
+    for r in runs:
+        ticket = r.get('ticket', 'unknown')
+        ctx = r['context_len']
+        batch = r['batch']
+        mode = r.get('phase') or r.get('mode')
+        
+        key = (ticket, ctx, batch)
+        if mode:
+            pairs[key][mode] = r
+
+    results = []
+    global_verdict = 'PASS'
+    
+    for key, modes in sorted(pairs.items()):
+        ticket, ctx, batch = key
+        row = {
+            'ticket': ticket, 'context': ctx, 'batch': batch,
+            'verdict': 'INCOMPLETE', 'token_agreement': None,
+            'peak_vram': 0, 'prefill_time': None, 'decode_time': None,
+            'tokens_per_sec': 0
+        }
+        
+        if 'prefill' in modes and 'decode' in modes:
+            p_run = modes['prefill']
+            d_run = modes['decode']
+            
+            row['prefill_time'] = p_run.get('wall_time_sec')
+            row['decode_time'] = d_run.get('wall_time_sec')
+            row['tokens_per_sec'] = d_run.get('tokens_per_sec', 0)
+            row['peak_vram'] = p_run.get('vram', {}).get('peak_vram_mb', 0)
+            
+            if p_run.get('exit_status', 'OK') == 'OK' and d_run.get('exit_status', 'OK') == 'OK':
+                # Check tokens if they exist
+                if p_run['_tokens'] and d_run['_tokens'] and os.path.exists(p_run['_tokens']) and os.path.exists(d_run['_tokens']):
+                    agreement = compute_token_agreement(p_run['_tokens'], d_run['_tokens'])
+                    row['token_agreement'] = agreement
+                    if agreement == 1.0:
+                        row['verdict'] = 'PASS'
+                    else:
+                        row['verdict'] = 'FAIL_TOKEN_MISMATCH'
+                        global_verdict = 'FAIL'
+                else:
+                    # If no tokens file but exit status is OK, we might be in an old run or span=0 with no token dump
+                    # But B3.82-84 requires token match.
+                    row['verdict'] = 'MISSING_TOKENS'
+                    global_verdict = 'FAIL'
+            else:
+                st = p_run.get('exit_status', 'FAIL_ERROR')
+                row['verdict'] = st
+                global_verdict = 'FAIL'
+
+        results.append(row)
+
+    # Scaling Calculation for B3.82
+    b3_82_results = [r for r in results if r['ticket'] == 'b3_82']
+    base_tps = next((r['tokens_per_sec'] for r in b3_82_results if r['batch'] == 1 and r['verdict'] == 'PASS'), None)
+    
+    # Markdown Report
+    with open(output_path, 'w') as f:
+        f.write("# B3.82-84 Steady-State & Long-Context Report\n\n")
+        f.write(f"**Global Verdict:** {global_verdict}\n\n")
+        
+        for ticket_id in ['b3_82', 'b3_83', 'b3_84']:
+            ticket_results = [r for r in results if r['ticket'] == ticket_id]
+            if not ticket_results: continue
+            
+            f.write(f"## {ticket_id.upper()} Results\n\n")
+            f.write("| Context | Batch | Peak VRAM | Prefill (s) | Decode (s) | Tokens/s | Speedup | Token Match | Verdict |\n")
+            f.write("|---|---|---|---|---|---|---|---|---|\n")
+            for r in ticket_results:
+                p_t = f"{r['prefill_time']:.2f}" if r['prefill_time'] is not None else "N/A"
+                d_t = f"{r['decode_time']:.2f}" if r['decode_time'] is not None else "N/A"
+                agree = f"{r['token_agreement']*100:.1f}%" if r['token_agreement'] is not None else "N/A"
+                speedup = "1.00x"
+                if ticket_id == 'b3_82' and base_tps and r['tokens_per_sec']:
+                    speedup = f"{r['tokens_per_sec']/base_tps:.2f}x"
+                
+                f.write(f"| {r['context']} | {r['batch']} | {r['peak_vram']} | {p_t} | {d_t} | {r['tokens_per_sec']:.2f} | {speedup} | {agree} | {r['verdict']} |\n")
+            f.write("\n")
+
+    print(f"Report written to: {output_path}")
+
+    # JSON Summary
+    summary = {
+        'suite': "B3.82-84",
+        'global_verdict': global_verdict,
+        'config': config,
+        'results': results,
+        'timestamp': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+    }
+    summary_path = Path(output_path).parent / "summary.json"
+    with open(summary_path, 'w') as f:
+        json.dump(summary, f, indent=2)
+    print(f"Summary written to: {summary_path}")
+
+    return 0 if global_verdict == 'PASS' else 1
+
 def main():
     parser = argparse.ArgumentParser(description='B3.67 Equivalence Guardrail Analyzer')
     parser.add_argument('--traces-dir', type=str, required=True,
@@ -2240,8 +2374,8 @@ def main():
                         help='Expected seeds (comma-separated)')
     parser.add_argument('--kv-aligned', type=str, default='0,1',
                         help='Expected kv_aligned values (comma-separated)')
-    parser.add_argument('--mode', type=str, default='b3_67', choices=['b3_67', 'b3_69', 'b3_70_71_72', 'b3_73', 'b3_74', 'b3_75', 'b3_76', 'b3_77', 'b3_78_80', 'b3_81'],
-                        help='Analysis mode: b3_67 (metadata), b3_69 (logits), b3_70+ (sweep), b3_73 (reconcile), b3_74 (internal), b3_75 (CI), b3_76 (pressure), b3_77 (32k), b3_78_80 (suite), b3_81 (batch)')
+    parser.add_argument('--mode', type=str, default='b3_67', choices=['b3_67', 'b3_69', 'b3_70_71_72', 'b3_73', 'b3_74', 'b3_75', 'b3_76', 'b3_77', 'b3_78_80', 'b3_81', 'b3_82_84'],
+                        help='Analysis mode: b3_67 (metadata), b3_69 (logits), b3_70+ (sweep), b3_73 (reconcile), b3_74 (internal), b3_75 (CI), b3_76 (pressure), b3_77 (32k), b3_78_80 (suite), b3_81 (batch), b3_82_84 (steady)')
     
     args = parser.parse_args()
     
@@ -2275,6 +2409,10 @@ def main():
     # B3.81 batch mode
     if args.mode == 'b3_81':
         return run_b3_81_throughput_analysis(args.traces_dir, args.output)
+
+    # B3.82-84 steady mode
+    if args.mode == 'b3_82_84':
+        return run_b3_82_84_suite_analysis(args.traces_dir, args.output)
     
     # B3.74 internal audit mode
     if args.mode == 'b3_74':
