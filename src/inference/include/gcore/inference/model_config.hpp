@@ -15,9 +15,9 @@ struct ModelConfig {
   uint32_t vocab_size = 32000; // Vocabulary size
   uint32_t hidden_dim = 11008; // MLP hidden dimension (Llama uses 11008 for 7B)
   uint32_t head_dim = 128;     // dim / num_heads
-  uint32_t max_seq_len = 2048; // Maximum sequence length
-  float rope_base = 10000.0f;  // RoPE base frequency
-  float rms_eps = 1e-5f;       // RMSNorm epsilon
+  uint32_t max_seq_len = 32768;        // Maximum sequence length
+  float rope_base = 10000.0f;          // RoPE base frequency
+  float rms_eps = 1e-5f;               // RMSNorm epsilon
   std::vector<std::string> vocabulary; // Global vocabulary
 
   /// Create a Llama-2-7B configuration.
@@ -30,7 +30,7 @@ struct ModelConfig {
     cfg.vocab_size = 32000;
     cfg.hidden_dim = 11008;
     cfg.head_dim = 128;
-    cfg.max_seq_len = 2048;
+    cfg.max_seq_len = 32768;
     return cfg;
   }
 

@@ -22,13 +22,15 @@ run_config() {
 
     echo "[B3.85] Running CTX=$ctx, Timeout=${timeout}s..."
     
-    # Generate a prompt of exactly $ctx tokens (approx 4 chars per token)
+    # Generate a prompt. We use a shorter string repeated to avoid exploding character count
+    # if the tokenizer is inefficient.
     local PROMPT_FILE="/tmp/prompt_${ctx}.txt"
-    python3 -c "print('hello ' * $ctx)" > "$PROMPT_FILE"
+    python3 -c "print('hello ' * ($ctx // 2))" > "$PROMPT_FILE"
 
-    export GRETA_KV_ALIGNED=$KV_ALIGNED
-    export GRETA_SEED=$SEED
+    export GRETA_KV_ALIGNED=1
+    export GRETA_SEED=0
     export GRETA_VERBOSE_INFO=1
+    export GRETA_MAX_SEQ_LEN=65536
     
     # Start VRAM sampling
     local VRAM_LOG="$TARGET_OUT/vram_samples.csv"

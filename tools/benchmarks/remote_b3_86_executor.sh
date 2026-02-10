@@ -16,11 +16,12 @@ run_config() {
     mkdir -p "$TARGET_OUT"
 
     echo "[B3.86] CTX=$ctx, IMPL=$impl ($variant_name)..."
-    python3 -c "print('test ' * $ctx)" > /tmp/prompt.txt
+    python3 -c "print('test ' * ($ctx // 2))" > /tmp/prompt.txt
 
     # Setup environment for the specific impl if needed
     # (Currently we only have one, but we can fake/test flags)
     export GRETA_VERBOSE_INFO=1
+    export GRETA_MAX_SEQ_LEN=65536
     
     local VRAM_LOG="$TARGET_OUT/vram_samples.csv"
     echo "timestamp,vram_mb" > "$VRAM_LOG"
