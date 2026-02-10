@@ -30,18 +30,27 @@ SSH_OPTS="-o StrictHostKeyChecking=no -o ConnectTimeout=120"
 
 echo "=== B3.82-84 Steady-State Suite Runner (MI300X) ==="
 echo "[1/4] Preparing remote environment..."
-scp $SSH_OPTS tools/benchmarks/remote_b3_82_84_executor.sh root@$HOST:/tmp/remote_b3_82_84_executor.sh
-ssh $SSH_OPTS root@$HOST "chmod +x /tmp/remote_b3_82_84_executor.sh"
+until scp $SSH_OPTS tools/benchmarks/remote_b3_82_84_executor.sh root@$HOST:/tmp/remote_b3_82_84_executor.sh; do
+    echo "SCP failed, retrying in 10s..."
+    sleep 10
+done
+until ssh $SSH_OPTS root@$HOST "chmod +x /tmp/remote_b3_82_84_executor.sh"; do
+    echo "SSH chmod failed, retrying in 10s..."
+    sleep 10
+done
 
 echo "[2/4] Syncing and building on $HOST..."
 # We need to build with the new changes in greta_infer.cpp
-ssh $SSH_OPTS root@$HOST "
+until ssh $SSH_OPTS root@$HOST "
     cd $REMOTE_BASE
     git fetch origin
     git reset --hard origin/main
     cd tools/inference/build
     make -j\$(nproc)
-"
+"; do
+    echo "Sync/Build failed, retrying in 10s..."
+    sleep 10
+done
 
 echo "[3/4] Executing Suite B3.82-84 (via nohup)..."
 until ssh $SSH_OPTS root@$HOST "nohup /tmp/remote_b3_82_84_executor.sh \"$DATE\" > /tmp/b3_82_84.log 2>&1 &"; do
