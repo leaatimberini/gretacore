@@ -29,7 +29,7 @@
 namespace greta_d2h_safe {
 
 // Validar que un puntero de device es seguro para leer
-inline bool is_valid_device_ptr(const void* ptr, size_t expected_size) {
+inline bool is_valid_device_ptr(const void *ptr, size_t expected_size) {
   if (!ptr) {
     return false;
   }
@@ -37,12 +37,9 @@ inline bool is_valid_device_ptr(const void* ptr, size_t expected_size) {
 }
 
 // Wrapper seguro para hipMemcpy D2H con validacion
-inline bool safe_hipMemcpy(
-    void* dst,
-    const void* src,
-    size_t bytes,
-    hipMemcpyKind kind,
-    const char* debug_name = "unknown") {
+inline bool safe_hipMemcpy(void *dst, const void *src, size_t bytes,
+                           hipMemcpyKind kind,
+                           const char *debug_name = "unknown") {
   if (!dst || !src || bytes == 0) {
     std::cerr << "[D2H SAFE] Skip copy " << debug_name
               << " - null ptr or zero bytes\n";
@@ -58,13 +55,9 @@ inline bool safe_hipMemcpy(
 }
 
 // Wrapper seguro para hipMemcpyAsync D2H con sync guarantee
-inline bool safe_hipMemcpyAsync(
-    void* dst,
-    const void* src,
-    size_t bytes,
-    hipMemcpyKind kind,
-    hipStream_t stream,
-    const char* debug_name = "unknown") {
+inline bool safe_hipMemcpyAsync(void *dst, const void *src, size_t bytes,
+                                hipMemcpyKind kind, hipStream_t stream,
+                                const char *debug_name = "unknown") {
   if (!dst || !src || bytes == 0) {
     std::cerr << "[D2H SAFE] Skip async copy " << debug_name
               << " - null ptr or zero bytes\n";
@@ -102,43 +95,35 @@ inline bool safe_hipMemcpyAsync(
 namespace greta_rope_diag {
 
 // Valida parametros antes de lanzar RoPE kernel
-inline bool validate_rope_params(
-    const void* x_ptr,
-    uint32_t seq_len,
-    uint32_t num_heads,
-    uint32_t head_dim,
-    float rope_base,
-    const void* pos_ptr,
-    const char* kernel_name) {
+inline bool validate_rope_params(const void *x_ptr, uint32_t seq_len,
+                                 uint32_t num_heads, uint32_t head_dim,
+                                 float rope_base, const void *pos_ptr,
+                                 const char *kernel_name) {
 
   bool is_valid = true;
 
   // Validar puntero del tensor
   if (!x_ptr) {
-    std::cerr << "[ROPE_DIAG] ERROR " << kernel_name
-              << ": x_ptr is NULL\n";
+    std::cerr << "[ROPE_DIAG] ERROR " << kernel_name << ": x_ptr is NULL\n";
     is_valid = false;
   }
 
   // Validar dimensiones
   if (seq_len == 0) {
-    std::cerr << "[ROPE_DIAG] ERROR " << kernel_name
-              << ": seq_len is 0\n";
+    std::cerr << "[ROPE_DIAG] ERROR " << kernel_name << ": seq_len is 0\n";
     is_valid = false;
   }
   if (num_heads == 0) {
-    std::cerr << "[ROPE_DIAG] ERROR " << kernel_name
-              << ": num_heads is 0\n";
+    std::cerr << "[ROPE_DIAG] ERROR " << kernel_name << ": num_heads is 0\n";
     is_valid = false;
   }
   if (head_dim == 0) {
-    std::cerr << "[ROPE_DIAG] ERROR " << kernel_name
-              << ": head_dim is 0\n";
+    std::cerr << "[ROPE_DIAG] ERROR " << kernel_name << ": head_dim is 0\n";
     is_valid = false;
   }
   if (head_dim % 2 != 0) {
-    std::cerr << "[ROPE_DIAG] ERROR " << kernel_name
-              << ": head_dim is odd (" << head_dim << ") - RoPE requires even\n";
+    std::cerr << "[ROPE_DIAG] ERROR " << kernel_name << ": head_dim is odd ("
+              << head_dim << ") - RoPE requires even\n";
     is_valid = false;
   }
 
@@ -149,6 +134,7 @@ inline bool validate_rope_params(
     is_valid = false;
   }
 
+  /*
   // Log estructurado de parametros
   std::cerr << "[ROPE_DIAG] " << kernel_name
             << " x_ptr=" << std::hex << x_ptr
@@ -159,6 +145,7 @@ inline bool validate_rope_params(
             << " pos_ptr=" << std::hex << pos_ptr
             << " valid=" << (is_valid ? "true" : "false")
             << "\n";
+  */
 
   return is_valid;
 }
@@ -1151,8 +1138,9 @@ static void post_wo_trace_tensor(const char *point, const char *phase,
       std::min<uint32_t>(post_wo_sample(), static_cast<uint32_t>(stride_elems));
   std::vector<float> host(sample_n, 0.0f);
   if (sample_n > 0) {
-    greta_d2h_safe::safe_hipMemcpyAsync(host.data(), ptr, sample_n * sizeof(float),
-                   hipMemcpyDeviceToHost, stream, "post_wo_trace");
+    greta_d2h_safe::safe_hipMemcpyAsync(
+        host.data(), ptr, sample_n * sizeof(float), hipMemcpyDeviceToHost,
+        stream, "post_wo_trace");
   }
   const F32Stats stats = stats_f32(host.data(), host.size());
   const uint64_t hash = hash_f32(host.data(), host.size());
@@ -1211,13 +1199,16 @@ static void trace_rmsnorm(
   std::vector<float> out_host(sample_n, 0.0f);
   std::vector<float> w_host(sample_n, 0.0f);
   if (sample_n > 0) {
-    greta_d2h_safe::safe_hipMemcpyAsync(in_host.data(), in_ptr, sample_n * sizeof(float),
-                   hipMemcpyDeviceToHost, stream, "rmsnorm_trace_in");
-    greta_d2h_safe::safe_hipMemcpyAsync(out_host.data(), out_ptr, sample_n * sizeof(float),
-                   hipMemcpyDeviceToHost, stream, "rmsnorm_trace_out");
+    greta_d2h_safe::safe_hipMemcpyAsync(
+        in_host.data(), in_ptr, sample_n * sizeof(float), hipMemcpyDeviceToHost,
+        stream, "rmsnorm_trace_in");
+    greta_d2h_safe::safe_hipMemcpyAsync(
+        out_host.data(), out_ptr, sample_n * sizeof(float),
+        hipMemcpyDeviceToHost, stream, "rmsnorm_trace_out");
     if (weight.data()) {
-      greta_d2h_safe::safe_hipMemcpyAsync(w_host.data(), weight.data(), sample_n * sizeof(float),
-                     hipMemcpyDeviceToHost, stream, "rmsnorm_trace_weight");
+      greta_d2h_safe::safe_hipMemcpyAsync(
+          w_host.data(), weight.data(), sample_n * sizeof(float),
+          hipMemcpyDeviceToHost, stream, "rmsnorm_trace_weight");
     }
     hipStreamSynchronize(stream);
   }
@@ -1329,7 +1320,8 @@ public:
     return res == hipSuccess;
   }
   bool copy_to_host(void *dst, size_t size) const override {
-    return greta_d2h_safe::safe_hipMemcpy(dst, data(), size, hipMemcpyDeviceToHost, "tensor_copy_to_host");
+    return greta_d2h_safe::safe_hipMemcpy(
+        dst, data(), size, hipMemcpyDeviceToHost, "tensor_copy_to_host");
   }
 
 private:
@@ -2082,30 +2074,35 @@ bool BlockScheduler::execute_layer(size_t layer_idx, size_t seq_start,
                          config_.max_seq_len, Hkv, Dh, config_.rope_base),
                      "Fused RoPE+KV Update");
     // B3.64 DIAG: Validar parametros RoPE antes de lanzar
-    greta_rope_diag::validate_rope_params(q, S, Hq, Dh, config_.rope_base, d_pos, "RoPE Q (Fused KV)");
+    greta_rope_diag::validate_rope_params(q, S, Hq, Dh, config_.rope_base,
+                                          d_pos, "RoPE Q (Fused KV)");
     CHECK_HIP_KERNEL(
         launch_rope(hip_stream, q, S, Hq, Dh, config_.rope_base, d_pos),
         "RoPE Q (Fused KV)");
   } else {
     if (S == 1) {
       // B3.64 DIAG: Validar parametros RoPE Q decode
-      greta_rope_diag::validate_rope_params(q, S, Hq, Dh, config_.rope_base, d_pos, "RoPE Q decode");
+      greta_rope_diag::validate_rope_params(q, S, Hq, Dh, config_.rope_base,
+                                            d_pos, "RoPE Q decode");
       CHECK_HIP_KERNEL(
           launch_rope(hip_stream, q, S, Hq, Dh, config_.rope_base, d_pos),
           "RoPE Q");
       // B3.64 DIAG: Validar parametros RoPE K decode
-      greta_rope_diag::validate_rope_params(k, S, Hkv, Dh, config_.rope_base, d_pos, "RoPE K decode");
+      greta_rope_diag::validate_rope_params(k, S, Hkv, Dh, config_.rope_base,
+                                            d_pos, "RoPE K decode");
       CHECK_HIP_KERNEL(
           launch_rope(hip_stream, k, S, Hkv, Dh, config_.rope_base, d_pos),
           "RoPE K");
     } else {
       // B3.64 DIAG: Validar parametros RoPE Q prefill
-      greta_rope_diag::validate_rope_params(q, S, Hq, Dh, config_.rope_base, d_pos, "RoPE Q prefill");
+      greta_rope_diag::validate_rope_params(q, S, Hq, Dh, config_.rope_base,
+                                            d_pos, "RoPE Q prefill");
       CHECK_HIP_KERNEL(
           launch_rope(hip_stream, q, S, Hq, Dh, config_.rope_base, pos),
           "RoPE Q");
       // B3.64 DIAG: Validar parametros RoPE K prefill
-      greta_rope_diag::validate_rope_params(k, S, Hkv, Dh, config_.rope_base, d_pos, "RoPE K prefill");
+      greta_rope_diag::validate_rope_params(k, S, Hkv, Dh, config_.rope_base,
+                                            d_pos, "RoPE K prefill");
       CHECK_HIP_KERNEL(
           launch_rope(hip_stream, k, S, Hkv, Dh, config_.rope_base, pos),
           "RoPE K");
@@ -2298,8 +2295,9 @@ bool BlockScheduler::execute_layer(size_t layer_idx, size_t seq_start,
                       "Attention Core (Shadow)");
 
           std::vector<float> host(D);
-          greta_d2h_safe::safe_hipMemcpy(host.data(), attn_out_buf.data(), q_bytes,
-                    hipMemcpyDeviceToHost, "attention_shadow_stats");
+          greta_d2h_safe::safe_hipMemcpy(host.data(), attn_out_buf.data(),
+                                         q_bytes, hipMemcpyDeviceToHost,
+                                         "attention_shadow_stats");
           stats_out = stats_f32(host.data(), host.size());
           hash_out = hash_f32(host.data(), host.size());
           return true;
@@ -2333,10 +2331,12 @@ bool BlockScheduler::execute_layer(size_t layer_idx, size_t seq_start,
         if (ok_mfma && ok_valu) {
           mfma_host.resize(D);
           valu_host.resize(D);
-          greta_d2h_safe::safe_hipMemcpy(mfma_host.data(), attn_out_mfma.data(), q_bytes,
-                    hipMemcpyDeviceToHost, "attention_mfma_trace");
-          greta_d2h_safe::safe_hipMemcpy(valu_host.data(), attn_out_valu.data(), q_bytes,
-                    hipMemcpyDeviceToHost, "attention_valu_trace");
+          greta_d2h_safe::safe_hipMemcpy(mfma_host.data(), attn_out_mfma.data(),
+                                         q_bytes, hipMemcpyDeviceToHost,
+                                         "attention_mfma_trace");
+          greta_d2h_safe::safe_hipMemcpy(valu_host.data(), attn_out_valu.data(),
+                                         q_bytes, hipMemcpyDeviceToHost,
+                                         "attention_valu_trace");
           mae_max_f32(mfma_host.data(), valu_host.data(), mfma_host.size(),
                       &mae, &max_diff);
         }
@@ -2426,34 +2426,38 @@ bool BlockScheduler::execute_layer(size_t layer_idx, size_t seq_start,
         if (want_norm && norm_sample > 0) {
           norm_in_host.assign(norm_sample, 0.0f);
           const float *x_token = x + static_cast<size_t>(token_index_used) * D;
-          greta_d2h_safe::safe_hipMemcpyAsync(norm_in_host.data(), x_token,
-                         norm_sample * sizeof(float), hipMemcpyDeviceToHost,
-                         hip_stream, "attention_norm_in");
+          greta_d2h_safe::safe_hipMemcpyAsync(
+              norm_in_host.data(), x_token, norm_sample * sizeof(float),
+              hipMemcpyDeviceToHost, hip_stream, "attention_norm_in");
           if (!use_fused) {
             norm_out_valid = true;
             norm_out_host.assign(norm_sample, 0.0f);
             const float *norm_token =
                 norm_out + static_cast<size_t>(token_index_used) * D;
-            greta_d2h_safe::safe_hipMemcpyAsync(norm_out_host.data(), norm_token,
-                           norm_sample * sizeof(float), hipMemcpyDeviceToHost,
-                           hip_stream, "attention_norm_out");
+            greta_d2h_safe::safe_hipMemcpyAsync(
+                norm_out_host.data(), norm_token, norm_sample * sizeof(float),
+                hipMemcpyDeviceToHost, hip_stream, "attention_norm_out");
           }
         }
 
-        greta_d2h_safe::safe_hipMemcpyAsync(q_host.data(), q_head, Dh * sizeof(float),
-                       hipMemcpyDeviceToHost, hip_stream, "attention_q");
-        greta_d2h_safe::safe_hipMemcpyAsync(k_host.data(), k_head_base,
-                       static_cast<size_t>(seq_len_used) * Dh * sizeof(float),
-                       hipMemcpyDeviceToHost, hip_stream, "attention_k");
-        greta_d2h_safe::safe_hipMemcpyAsync(v_host.data(), v_head_base,
-                       static_cast<size_t>(seq_len_used) * Dh * sizeof(float),
-                       hipMemcpyDeviceToHost, hip_stream, "attention_v");
+        greta_d2h_safe::safe_hipMemcpyAsync(
+            q_host.data(), q_head, Dh * sizeof(float), hipMemcpyDeviceToHost,
+            hip_stream, "attention_q");
+        greta_d2h_safe::safe_hipMemcpyAsync(
+            k_host.data(), k_head_base,
+            static_cast<size_t>(seq_len_used) * Dh * sizeof(float),
+            hipMemcpyDeviceToHost, hip_stream, "attention_k");
+        greta_d2h_safe::safe_hipMemcpyAsync(
+            v_host.data(), v_head_base,
+            static_cast<size_t>(seq_len_used) * Dh * sizeof(float),
+            hipMemcpyDeviceToHost, hip_stream, "attention_v");
 
         const float *attn_token =
             attn_out + static_cast<size_t>(token_index_used) * D;
         const float *attn_head = attn_token + head * Dh;
-        greta_d2h_safe::safe_hipMemcpyAsync(attn_host.data(), attn_head, Dh * sizeof(float),
-                       hipMemcpyDeviceToHost, hip_stream, "attention_attn");
+        greta_d2h_safe::safe_hipMemcpyAsync(
+            attn_host.data(), attn_head, Dh * sizeof(float),
+            hipMemcpyDeviceToHost, hip_stream, "attention_attn");
         hipStreamSynchronize(hip_stream);
 
         const float *k_vec =
@@ -2963,10 +2967,12 @@ bool BlockScheduler::execute_layer(size_t layer_idx, size_t seq_start,
             attn_out + static_cast<size_t>(stage_token_index) * D;
         const float *wo_vec =
             mlp_out + static_cast<size_t>(stage_token_index) * D;
-        bool err_a = greta_d2h_safe::safe_hipMemcpy(attn_out_host.data(), attn_vec,
-                                     D * sizeof(float), hipMemcpyDeviceToHost, "mlp_attn_out");
-        bool err_b = greta_d2h_safe::safe_hipMemcpy(wo_out_host.data(), wo_vec,
-                                     D * sizeof(float), hipMemcpyDeviceToHost, "mlp_wo_out");
+        bool err_a = greta_d2h_safe::safe_hipMemcpy(
+            attn_out_host.data(), attn_vec, D * sizeof(float),
+            hipMemcpyDeviceToHost, "mlp_attn_out");
+        bool err_b = greta_d2h_safe::safe_hipMemcpy(
+            wo_out_host.data(), wo_vec, D * sizeof(float),
+            hipMemcpyDeviceToHost, "mlp_wo_out");
         if (!err_a || !err_b) {
           attn_out_host.clear();
           wo_out_host.clear();
@@ -3276,18 +3282,20 @@ bool BlockScheduler::execute_layer(size_t layer_idx, size_t seq_start,
       if (trace_attn_softmax || trace_attn_vacc ||
           (point_mask & static_cast<uint32_t>(AttnTracePoint::Q))) {
         q_host.resize(D);
-        greta_d2h_safe::safe_hipMemcpy(q_host.data(), q, D * sizeof(float), hipMemcpyDeviceToHost, "trace_q");
+        greta_d2h_safe::safe_hipMemcpy(q_host.data(), q, D * sizeof(float),
+                                       hipMemcpyDeviceToHost, "trace_q");
       }
       if (trace_attn_vacc ||
           (point_mask & static_cast<uint32_t>(AttnTracePoint::ATTN_OUT))) {
         attn_out_host.resize(D);
-        greta_d2h_safe::safe_hipMemcpy(attn_out_host.data(), attn_out, D * sizeof(float),
-                  hipMemcpyDeviceToHost, "trace_attn_out");
+        greta_d2h_safe::safe_hipMemcpy(attn_out_host.data(), attn_out,
+                                       D * sizeof(float), hipMemcpyDeviceToHost,
+                                       "trace_attn_out");
       }
       if (point_mask & static_cast<uint32_t>(AttnTracePoint::X_OUT)) {
         x_out_host.resize(D);
         greta_d2h_safe::safe_hipMemcpy(x_out_host.data(), x, D * sizeof(float),
-                  hipMemcpyDeviceToHost, "trace_x_out");
+                                       hipMemcpyDeviceToHost, "trace_x_out");
       }
 
       const size_t kv_layer_stride_elems =
@@ -3322,10 +3330,12 @@ bool BlockScheduler::execute_layer(size_t layer_idx, size_t seq_start,
       if (need_kv_full) {
         k_cache_host.resize(kv_layer_stride_elems);
         v_cache_host.resize(kv_layer_stride_elems);
-        greta_d2h_safe::safe_hipMemcpy(k_cache_host.data(), k_cache_layer, kv_layer_stride_bytes,
-                  hipMemcpyDeviceToHost, "trace_k_cache");
-        greta_d2h_safe::safe_hipMemcpy(v_cache_host.data(), v_cache_layer, kv_layer_stride_bytes,
-                  hipMemcpyDeviceToHost, "trace_v_cache");
+        greta_d2h_safe::safe_hipMemcpy(k_cache_host.data(), k_cache_layer,
+                                       kv_layer_stride_bytes,
+                                       hipMemcpyDeviceToHost, "trace_k_cache");
+        greta_d2h_safe::safe_hipMemcpy(v_cache_host.data(), v_cache_layer,
+                                       kv_layer_stride_bytes,
+                                       hipMemcpyDeviceToHost, "trace_v_cache");
       } else if (need_kv_head && trace_kv_head < Hkv) {
         kv_head_only = true;
         k_cache_host.resize(kv_head_stride_elems);
@@ -3334,10 +3344,12 @@ bool BlockScheduler::execute_layer(size_t layer_idx, size_t seq_start,
             k_cache_layer + trace_kv_head * kv_head_stride_elems;
         const float *v_head_dev =
             v_cache_layer + trace_kv_head * kv_head_stride_elems;
-        greta_d2h_safe::safe_hipMemcpy(k_cache_host.data(), k_head_dev, kv_head_stride_bytes,
-                  hipMemcpyDeviceToHost, "trace_k_head");
-        greta_d2h_safe::safe_hipMemcpy(v_cache_host.data(), v_head_dev, kv_head_stride_bytes,
-                  hipMemcpyDeviceToHost, "trace_v_head");
+        greta_d2h_safe::safe_hipMemcpy(k_cache_host.data(), k_head_dev,
+                                       kv_head_stride_bytes,
+                                       hipMemcpyDeviceToHost, "trace_k_head");
+        greta_d2h_safe::safe_hipMemcpy(v_cache_host.data(), v_head_dev,
+                                       kv_head_stride_bytes,
+                                       hipMemcpyDeviceToHost, "trace_v_head");
       }
 
       F32Stats q_stats{};
@@ -3636,12 +3648,17 @@ bool BlockScheduler::execute_layer(size_t layer_idx, size_t seq_start,
             qk_gpu.assign(window_len, 0.0f);
             softmax_gpu.assign(window_len, 0.0f);
             stats_gpu.assign(5, 0.0f);
-            greta_d2h_safe::safe_hipMemcpy(qk_gpu.data(), qk_dev.data(), window_len * sizeof(float),
-                      hipMemcpyDeviceToHost, "trace_qk");
-            greta_d2h_safe::safe_hipMemcpy(softmax_gpu.data(), softmax_dev.data(),
-                      window_len * sizeof(float), hipMemcpyDeviceToHost, "trace_softmax");
+            greta_d2h_safe::safe_hipMemcpy(qk_gpu.data(), qk_dev.data(),
+                                           window_len * sizeof(float),
+                                           hipMemcpyDeviceToHost, "trace_qk");
+            greta_d2h_safe::safe_hipMemcpy(
+                softmax_gpu.data(), softmax_dev.data(),
+                window_len * sizeof(float), hipMemcpyDeviceToHost,
+                "trace_softmax");
             greta_d2h_safe::safe_hipMemcpy(stats_gpu.data(), stats_dev.data(),
-                      stats_gpu.size() * sizeof(float), hipMemcpyDeviceToHost, "trace_stats");
+                                           stats_gpu.size() * sizeof(float),
+                                           hipMemcpyDeviceToHost,
+                                           "trace_stats");
 
             q_head_hash = hash_f32(q_head, Dh);
             const float *k_pos = k_head + pos_id * Dh;
@@ -3815,10 +3832,12 @@ bool BlockScheduler::execute_layer(size_t layer_idx, size_t seq_start,
 
             std::vector<float> v_row(window_len * dims_sample, 0.0f);
             std::vector<float> v_col(window_len * dims_sample, 0.0f);
-            greta_d2h_safe::safe_hipMemcpy(v_row.data(), v_row_dev.data(), v_bytes,
-                      hipMemcpyDeviceToHost, "trace_v_row");
-            greta_d2h_safe::safe_hipMemcpy(v_col.data(), v_col_dev.data(), v_bytes,
-                      hipMemcpyDeviceToHost, "trace_v_col");
+            greta_d2h_safe::safe_hipMemcpy(v_row.data(), v_row_dev.data(),
+                                           v_bytes, hipMemcpyDeviceToHost,
+                                           "trace_v_row");
+            greta_d2h_safe::safe_hipMemcpy(v_col.data(), v_col_dev.data(),
+                                           v_bytes, hipMemcpyDeviceToHost,
+                                           "trace_v_col");
 
             std::vector<float> pv_gpu_sample(dims_sample, 0.0f);
             const float *attn_head =
@@ -4012,12 +4031,14 @@ bool BlockScheduler::execute_layer(size_t layer_idx, size_t seq_start,
         std::vector<float> k_cur_sample(dims_sample, 0.0f);
         std::vector<float> v_cur_sample(dims_sample, 0.0f);
         if (dims_sample > 0) {
-          greta_d2h_safe::safe_hipMemcpy(k_cur_sample.data(),
-                    k + static_cast<size_t>(trace_kv_head) * Dh,
-                    dims_sample * sizeof(float), hipMemcpyDeviceToHost, "trace_k_sample");
-          greta_d2h_safe::safe_hipMemcpy(v_cur_sample.data(),
-                    v + static_cast<size_t>(trace_kv_head) * Dh,
-                    dims_sample * sizeof(float), hipMemcpyDeviceToHost, "trace_v_sample");
+          greta_d2h_safe::safe_hipMemcpy(
+              k_cur_sample.data(), k + static_cast<size_t>(trace_kv_head) * Dh,
+              dims_sample * sizeof(float), hipMemcpyDeviceToHost,
+              "trace_k_sample");
+          greta_d2h_safe::safe_hipMemcpy(
+              v_cur_sample.data(), v + static_cast<size_t>(trace_kv_head) * Dh,
+              dims_sample * sizeof(float), hipMemcpyDeviceToHost,
+              "trace_v_sample");
         }
 
         std::vector<float> k_cache_row_pos(dims_sample, 0.0f);
@@ -4187,7 +4208,8 @@ bool BlockScheduler::execute_layer(size_t layer_idx, size_t seq_start,
           return false;
         std::vector<float> host(n);
         greta_d2h_safe::safe_hipMemcpyAsync(host.data(), d, n * sizeof(float),
-                           hipMemcpyDeviceToHost, hip_stream, "attention_output_trace");
+                                            hipMemcpyDeviceToHost, hip_stream,
+                                            "attention_output_trace");
         *stats = stats_f32(host.data(), n);
         *hash = hash_f32(host.data(), n);
         return true;

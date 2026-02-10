@@ -43,11 +43,31 @@ ssh $SSH_OPTS root@$HOST "
     make -j\$(nproc)
 "
 
-echo "[3/4] Executing Suite B3.82-84..."
-ssh $SSH_OPTS root@$HOST "/tmp/remote_b3_82_84_executor.sh \"$DATE\""
+echo "[3/4] Executing Suite B3.82-84 (via nohup)..."
+until ssh $SSH_OPTS root@$HOST "nohup /tmp/remote_b3_82_84_executor.sh \"$DATE\" > /tmp/b3_82_84.log 2>&1 &"; do
+    echo "Failed to start remote script, retrying in 10s..."
+    sleep 10
+done
+echo "Remote suite started in background. Waiting for completion..."
 
+# Simple poll for completion
+until ssh $SSH_OPTS root@$HOST "grep -q 'DONE_REMOTE_B3_82_84' /tmp/b3_82_84.log" 2>/dev/null; do
+    echo -n "."
+    # If SSH failed (exit code 255), just wait and retry
+    RET=$?
+    if [ $RET -eq 255 ]; then
+        echo -n "!"
+    fi
+    sleep 30
+done
+echo " Suite finished."
+
+# Retry SCP if it fails
 echo "[4/4] Downloading artifacts..."
-scp -r $SSH_OPTS root@$HOST:"$REMOTE_BASE/$RUN_ROOT/*" "$RUN_ROOT/" || true
+until scp -r $SSH_OPTS root@$HOST:"$REMOTE_BASE/$RUN_ROOT/*" "$RUN_ROOT/" 2>/dev/null; do
+    echo "SCP failed, retrying in 30s..."
+    sleep 30
+done
 
 # Generate config.json for analyzer
 GIT_COMMIT=$(ssh $SSH_OPTS root@$HOST "cd $REMOTE_BASE && git rev-parse --short HEAD")
