@@ -373,7 +373,13 @@ int main(int argc, char *argv[]) {
     std::cerr << "Generator init failed: " << err << "\n";
     return 1;
   }
-  std::cout << "Generator initialized\n\n";
+  std::cout << "Generator initialized\n";
+#ifdef GRETA_PREFILL_LDS_TILING
+  std::cout << "[ATTN_PREFILL_OPT] GRETA_PREFILL_LDS_TILING=1" << std::endl;
+#else
+  std::cout << "[ATTN_PREFILL_OPT] GRETA_PREFILL_LDS_TILING=0" << std::endl;
+#endif
+  std::cout << "\n";
 
   // Generate
   std::cout << "═══════════════════════════════════════════════════════════\n";

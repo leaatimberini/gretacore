@@ -51,6 +51,12 @@ set(HIP_KERNEL_SOURCES
 # Optional features
 option(GRETA_USE_SENTENCEPIECE "Enable SentencePiece tokenizer" ON)
 option(GRETA_TRACE_MEMCPY "Enable D2H memcpy tracing for B3.62 audit" OFF)
+option(GRETA_PREFILL_LDS_TILING "Enable LDS tiling for prefill attention kernel" OFF)
+
+if(GRETA_PREFILL_LDS_TILING)
+    message(STATUS "GRETA_PREFILL_LDS_TILING enabled")
+    add_definitions(-DGRETA_PREFILL_LDS_TILING=1)
+endif()
 
 # Add greta_trace_memcpy.hpp include path if tracing enabled
 if(GRETA_TRACE_MEMCPY)

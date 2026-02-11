@@ -2593,18 +2593,24 @@ def run_b3_89_analysis(traces_dir_str: str, output_path: str) -> int:
         
         for r in runs:
             c = r.get('context_len', 0)
+            wall = r.get('wall_time_sec', 0)
             t = r.get('timings', {}).get('prefill_s', 0)
+            tok = r.get('timings', {}).get('tokenize_s', 0)
+            ld = r.get('timings', {}).get('model_load_s', 0)
             
             target = 600.0 if c == 32768 else (600.0 * (c/32768)**2)
             improvement = "N/A"
-            # Here we would compare against B3.88 baseline if available
             
             f.write(f"| {c} | {t:.3f} | {target:.3f} | {improvement} |\n")
             
             report_data.append({
                 "context": c,
+                "wall_time_s": wall,
                 "prefill_s": t,
-                "target_s": target
+                "tokenize_s": tok,
+                "model_load_s": ld,
+                "target_s": target,
+                "attn_impl": r.get('timings', {}).get('attn_impl', 'unknown')
             })
             
     # Write summary.json

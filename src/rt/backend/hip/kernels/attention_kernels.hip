@@ -540,6 +540,100 @@ void launch_attn_vacc_vsample(hipStream_t stream, const float *V_cache,
 
 
 
+#ifdef GRETA_PREFILL_LDS_TILING
+__global__ void flash_attention_prefill_kernel(
+    const float *__restrict__ Q,      // [seq_len, num_heads, head_dim]
+    const float *__restrict__ K,      // [seq_len, num_heads_kv, head_dim]
+    const float *__restrict__ V,      // [seq_len, num_heads_kv, head_dim]
+    float *__restrict__ O,            // [seq_len, num_heads, head_dim]
+    uint32_t seq_len, uint32_t num_heads, uint32_t num_heads_kv,
+    uint32_t head_dim, float scale, bool causal) {
+
+  __shared__ float sK[FLASH_BLOCK_SIZE][FLASH_HEAD_DIM];
+  __shared__ float sV[FLASH_BLOCK_SIZE][FLASH_HEAD_DIM];
+
+  uint32_t head = blockIdx.x;
+  uint32_t q_block = blockIdx.y;
+  uint32_t tid = threadIdx.x;
+  if (num_heads_kv == 0) return;
+  uint32_t group = num_heads / num_heads_kv;
+  uint32_t kv_head = (group > 0) ? (head / group) : 0;
+  
+  uint32_t q_start = q_block * FLASH_BLOCK_SIZE;
+  if (q_start >= seq_len) return;
+  uint32_t q_end = min(q_start + FLASH_BLOCK_SIZE, seq_len);
+  
+  uint32_t q_idx = q_start + tid;
+  bool valid_q = (q_idx < q_end);
+  
+  float m = -INFINITY;
+  float l = 0.0f;
+  float o[FLASH_HEAD_DIM];
+  for (uint32_t d = 0; d < FLASH_HEAD_DIM; ++d) o[d] = 0.0f;
+  
+  // Stage Q into registers
+  float q_local[FLASH_HEAD_DIM];
+  for (uint32_t d = 0; d < FLASH_HEAD_DIM; ++d) q_local[d] = 0.0f;
+  
+  if (valid_q) {
+    for (uint32_t d = 0; d < head_dim; ++d) {
+      q_local[d] = Q[q_idx * num_heads * head_dim + head * head_dim + d];
+    }
+  }
+
+  uint32_t block_max_k = causal ? q_end : seq_len;
+
+  for (uint32_t k_start = 0; k_start < block_max_k; k_start += FLASH_BLOCK_SIZE) {
+    // Cooperative load K & V into LDS
+    uint32_t total_elements = FLASH_BLOCK_SIZE * head_dim;
+    for (uint32_t i = tid; i < total_elements; i += FLASH_BLOCK_SIZE) {
+        uint32_t row = i / head_dim;
+        uint32_t col = i % head_dim;
+        uint32_t abs_k = k_start + row;
+        uint32_t k_off = abs_k * num_heads_kv * head_dim + kv_head * head_dim + col;
+        if (abs_k < seq_len) {
+            sK[row][col] = K[k_off];
+            sV[row][col] = V[k_off];
+        } else {
+            sK[row][col] = 0.0f;
+            sV[row][col] = 0.0f;
+        }
+    }
+    __syncthreads();
+
+    if (valid_q) {
+        uint32_t k_end_in_tile = min(FLASH_BLOCK_SIZE, (causal ? (q_idx + 1) : seq_len) - k_start);
+        if (causal && k_start > q_idx) k_end_in_tile = 0;
+
+        for (uint32_t k_inner = 0; k_inner < k_end_in_tile; ++k_inner) {
+            float dot = 0.0f;
+            for (uint32_t d = 0; d < head_dim; ++d) {
+                dot += q_local[d] * sK[k_inner][d];
+            }
+            float s = dot * scale;
+            
+            float m_new = fmaxf(m, s);
+            float p = expf(s - m_new);
+            float correction = expf(m - m_new);
+            l = correction * l + p;
+            
+            for (uint32_t d = 0; d < head_dim; ++d) {
+                o[d] = correction * o[d] + p * sV[k_inner][d];
+            }
+            m = m_new;
+        }
+    }
+    __syncthreads();
+  }
+  
+  if (valid_q && l > 0) {
+    for (uint32_t d = 0; d < head_dim; ++d) {
+      uint32_t o_off = q_idx * num_heads * head_dim + head * head_dim + d;
+      O[o_off] = o[d] / l;
+    }
+  }
+}
+#else
 __global__ void flash_attention_prefill_kernel(
     const float *__restrict__ Q,      // [seq_len, num_heads, head_dim]
     const float *__restrict__ K,      // [seq_len, num_heads_kv, head_dim]
@@ -605,6 +699,7 @@ __global__ void flash_attention_prefill_kernel(
     }
   }
 }
+#endif
 
 void launch_flash_attention_prefill(hipStream_t stream,
                                     const float *Q, const float *K, const float *V,
