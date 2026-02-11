@@ -571,10 +571,6 @@ __global__ void flash_attention_prefill_kernel(
   __shared__ float sV[FLASH_BLOCK_SIZE][SEG];
 
   uint32_t head = blockIdx.x;
-  // ... (rest of preamble is same) ...
-  // (I will use multi_replace to be precise)
-
-  uint32_t head = blockIdx.x;
   uint32_t q_block = blockIdx.y;
   uint32_t tid = threadIdx.x;
   
