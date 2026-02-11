@@ -29,7 +29,7 @@ run_config() {
     export GRETA_KV_ALIGNED=1
     export GRETA_SEED=0
     export GRETA_VERBOSE_INFO=1
-    export GRETA_MAX_SEQ_LEN=32768
+    export GRETA_MAX_SEQ_LEN=40000
     
     # Start VRAM sampling
     local VRAM_LOG="$TARGET_OUT/vram_samples.csv"
