@@ -120,7 +120,7 @@
 | B3.86 | 2026-02-10 | Attn Impl Probe | COMPLETED | PASS_PROBE | flash_v2_naive detected | artifacts_remote/2026-02-10/b3_86/ | docs/AMD/2026_02_10_B3_86_attention_impl_probe.md |
 | B3.87 | 2026-02-10 | Decode TPS Decomposition | COMPLETED | PASS_RCA | -11.1% TPS delta | artifacts_remote/2026-02-10/b3_87/ | docs/AMD/2026_02_10_B3_87_decode_tps_decomposition.md |
 | B3.88 | 2026-02-10 | 32k Feasibility | COMPLETED | PASS_32K_FEASIBLE | 32k prefill achieved | artifacts_remote/2026-02-10/b3_88/ | docs/AMD/2026_02_10_B3_88_32k_feasibility.md |
-| B3.89 | 2026-02-10 | Prefill Kernel Optimization Plan | IN_PROGRESS | READY | TBD | plans/B3_89/ | docs/AMD/2026_02_10_B3_89_prefill_optimization_plan.md |
+| B3.89 | 2026-02-11 | Prefill Kernel Optimization | PARTIAL_FAIL | Regression (v1 & v2) | Scratch spills persist (528B) | artifacts_remote/2026-02-10/b3_89/ | docs/AMD/2026_02_10_B3_89_prefill_microbench_results.md |
 
 ---
 
