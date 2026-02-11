@@ -70,17 +70,11 @@
     - [x] Runner: Implement escalation (4k-32k)
     - [x] Analyzer: Aggregate timings, fit scaling law
     - [!] Status: INFRASTRUCTURE_READY; Awaiting remote execution stability
-- [x] **B3.86 — Prefill Kernel Switch Probe** (MI300X)
-    - [x] Engine: Detection logging for active attn impl
-    - [x] Runner: Test impl variants
-    - [!] Status: INFRASTRUCTURE_READY
-- [x] **B3.87 — Decode TPS Decomposition** (MI300X)
-    - [x] Runner: Test determinism flags impact
-    - [x] Analyzer: Separate compute vs overhead
-    - [x] Status: COMPLETED (partial results in artifacts_remote/2026-02-10/b3_87)
-- [x] **B3.88 — 32k Feasibility Milestone** (MI300X)
-    - [x] Runner: Target 32k prefill
-    - [!] Status: INFRASTRUCTURE_READY
+- B3.89 V3 (Q-LDS): `23714b7` (Infra: `ec6fe74`; Docs: `db69892`)
+- [ ] B3.89: Prefill Kernel Optimization V3/V4 - **IN_PROGRESS** (Gate Passed, 4k Success)
+    - [x] V3: Zero scratch spill achieved (MI300X)
+    - [x] V3: 4k prefill speedup 1.21x
+    - [ ] V4: SEG=32 exploration (Reduce reloads)
 - B3.74 internal audit: `f31ab1c`
 - Docs index: `1f662f1`
 
@@ -120,7 +114,7 @@
 | B3.86 | 2026-02-10 | Attn Impl Probe | COMPLETED | PASS_PROBE | flash_v2_naive detected | artifacts_remote/2026-02-10/b3_86/ | docs/AMD/2026_02_10_B3_86_attention_impl_probe.md |
 | B3.87 | 2026-02-10 | Decode TPS Decomposition | COMPLETED | PASS_RCA | -11.1% TPS delta | artifacts_remote/2026-02-10/b3_87/ | docs/AMD/2026_02_10_B3_87_decode_tps_decomposition.md |
 | B3.88 | 2026-02-10 | 32k Feasibility | COMPLETED | PASS_32K_FEASIBLE | 32k prefill achieved | artifacts_remote/2026-02-10/b3_88/ | docs/AMD/2026_02_10_B3_88_32k_feasibility.md |
-| B3.89 | 2026-02-11 | Prefill Kernel Optimization | PARTIAL_FAIL | Regression (v1 & v2) | Scratch spills persist (528B) | artifacts_remote/2026-02-10/b3_89/ | docs/AMD/2026_02_10_B3_89_prefill_microbench_results.md |
+| B3.89 | 2026-02-11 | Prefill Kernel Optimization | IN_PROGRESS | PASS_GATE (v3) | 1.21x Speedup @ 4k | artifacts_remote/2026-02-11/b3_89/ | docs/AMD/2026_02_10_B3_89_prefill_microbench_results.md |
 
 ---
 

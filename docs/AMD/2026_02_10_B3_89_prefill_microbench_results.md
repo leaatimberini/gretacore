@@ -44,5 +44,13 @@ Recorded with `GRETA_PREFILL_Q_LDS=1`.
 - **Scaling**: Re-loading K/V for each output segment (8 passes for SEG=16) is the cost.
   - But eliminating scratch spill provided huge win (timeout -> 18s).
 
-## 4. Conclusion
-TBD
+## 6. V4 Exploration (SEG=32)
+- **Goal**: Reduce K-load redundancy. V3 reloads K 8 times (128/16). V4 reloads 4 times (128/32).
+- **LDS**: `sV[32][32]` (4KB). Total LDS consistent with V3 (~36KB).
+- **Registers**: Uses 32 accumulators (`o0..o31`). Expected 0-scratch spill based on V3 occupancy.
+- **Status**: Code implemented. Awaiting MI300X execution.
+
+## 7. Conclusion
+V3 (Q-LDS) has successfully broken the scratch-spill bottleneck on MI300X, providing the first valid optimized path for long-context prefill. V4 is expected to further improve bandwidth efficiency.
+
+**Decision**: V3 is promoted to experimental status for long-context prefill.

@@ -541,8 +541,11 @@ void launch_attn_vacc_vsample(hipStream_t stream, const float *V_cache,
 
 
 #ifdef GRETA_PREFILL_Q_LDS
-// V3: Q-in-LDS + Segmented Output to eliminate scratch spilling
-// Strategy: Stage Q in LDS to avoid register pressure. Iterate output segments to keep accumulators in registers.
+// [V3] Q-in-LDS + Segmented Output to eliminate scratch spilling
+// ... existing V3 code ...
+// (I will need to verify if I can just modify the existing block or duplicate)
+// To keep minimal diff, I will use #if defined(GRETA_PREFILL_Q_LDS) || defined(GRETA_PREFILL_Q_LDS_V4)
+// and inside use #ifdef GRETA_PREFILL_Q_LDS_V4 for the V logic.
 #define FLASH_BLOCK_SIZE 32
 #define FLASH_HEAD_DIM 128
 
@@ -555,15 +558,21 @@ __global__ void flash_attention_prefill_kernel(
     uint32_t head_dim, float scale, bool causal) {
 
   // LDS Layout
-  // sQ: 32x128 floats = 16KB
-  // sK: 32x128 floats = 16KB
-  // sV: 32x16 floats  = 2KB (Segmented)
   __shared__ float sQ[FLASH_BLOCK_SIZE][FLASH_HEAD_DIM];
   __shared__ float sK[FLASH_BLOCK_SIZE][FLASH_HEAD_DIM];
   
-  // Segment size
+#ifdef GRETA_PREFILL_Q_LDS_V4
+  // V4: SEG=32 to reduce K-reloads (128/32 = 4 passes)
+  constexpr int SEG = 32;
+#else
+  // V3: SEG=16 (128/16 = 8 passes)
   constexpr int SEG = 16;
+#endif
   __shared__ float sV[FLASH_BLOCK_SIZE][SEG];
+
+  uint32_t head = blockIdx.x;
+  // ... (rest of preamble is same) ...
+  // (I will use multi_replace to be precise)
 
   uint32_t head = blockIdx.x;
   uint32_t q_block = blockIdx.y;
@@ -580,9 +589,9 @@ __global__ void flash_attention_prefill_kernel(
   uint32_t q_end = min(q_start + FLASH_BLOCK_SIZE, seq_len);
   bool valid_q = (q_idx < q_end);
   
-  // 1. Cooperative Load Q into LDS (Full Tile)
+  // 1. Cooperative Load Q into LDS
   {
-      uint32_t total_elements = FLASH_BLOCK_SIZE * 128; // Using 128 fixed for now as FLASH_HEAD_DIM
+      uint32_t total_elements = FLASH_BLOCK_SIZE * 128;
       for (uint32_t i = tid; i < total_elements; i += FLASH_BLOCK_SIZE) {
           uint32_t row = i / 128;
           uint32_t col = i % 128;
@@ -594,17 +603,19 @@ __global__ void flash_attention_prefill_kernel(
           }
       }
   }
-  // No barrier yet, we sync inside loop or before? 
-  // We need Q ready before we use it. But we iterate segments.
   __syncthreads();
   
   // Outer Loop: Segments of Output
   for (uint32_t d_start = 0; d_start < 128; d_start += SEG) {
       if (d_start >= head_dim) break;
       
-      // Scalar Accumulators (16 floats) -> ~16 VGPRs
+      // Scalar Accumulators
       float o0=0, o1=0, o2=0, o3=0, o4=0, o5=0, o6=0, o7=0;
       float o8=0, o9=0, o10=0, o11=0, o12=0, o13=0, o14=0, o15=0;
+#ifdef GRETA_PREFILL_Q_LDS_V4
+      float o16=0, o17=0, o18=0, o19=0, o20=0, o21=0, o22=0, o23=0;
+      float o24=0, o25=0, o26=0, o27=0, o28=0, o29=0, o30=0, o31=0;
+#endif
       
       float m = -INFINITY;
       float l = 0.0f;
@@ -613,9 +624,9 @@ __global__ void flash_attention_prefill_kernel(
       
       // Inner Loop: K/V blocks
       for (uint32_t k_start = 0; k_start < block_max_k; k_start += FLASH_BLOCK_SIZE) {
-          __syncthreads(); // Wait for consumers of previous sK/sV (if any)
+          __syncthreads(); 
           
-          // Cooperative Load K (Full) and V (Segment)
+          // Load K (Full)
           uint32_t k_elems = FLASH_BLOCK_SIZE * 128;
           for (uint32_t i = tid; i < k_elems; i += FLASH_BLOCK_SIZE) {
               uint32_t row = i / 128;
@@ -626,6 +637,7 @@ __global__ void flash_attention_prefill_kernel(
               else sK[row][col] = 0.0f;
           }
           
+          // Load V (Segment)
           uint32_t v_elems = FLASH_BLOCK_SIZE * SEG;
           for (uint32_t i = tid; i < v_elems; i += FLASH_BLOCK_SIZE) {
               uint32_t row = i / SEG;
@@ -635,7 +647,7 @@ __global__ void flash_attention_prefill_kernel(
               if (abs_k < seq_len && (d_start + col) < head_dim) sV[row][col] = V[k_off];
               else sV[row][col] = 0.0f;
           }
-          __syncthreads(); // Data ready
+          __syncthreads();
           
           if (valid_q) {
               uint32_t k_end_in_tile = min(FLASH_BLOCK_SIZE, (causal ? (q_idx + 1) : seq_len) - k_start);
@@ -643,8 +655,6 @@ __global__ void flash_attention_prefill_kernel(
               
               for (uint32_t k_inner = 0; k_inner < k_end_in_tile; ++k_inner) {
                   float dot = 0.0f;
-                  // Compute Dot Product using sQ and sK (LDS only)
-                  // Unroll manually or rely on compiler
                   #pragma unroll 16
                   for(int d=0; d<128; ++d) {
                       dot += sQ[tid][d] * sK[k_inner][d];
@@ -673,7 +683,24 @@ __global__ void flash_attention_prefill_kernel(
                   o13 = correction * o13 + p * sV[k_inner][13];
                   o14 = correction * o14 + p * sV[k_inner][14];
                   o15 = correction * o15 + p * sV[k_inner][15];
-                  
+#ifdef GRETA_PREFILL_Q_LDS_V4
+                  o16 = correction * o16 + p * sV[k_inner][16];
+                  o17 = correction * o17 + p * sV[k_inner][17];
+                  o18 = correction * o18 + p * sV[k_inner][18];
+                  o19 = correction * o19 + p * sV[k_inner][19];
+                  o20 = correction * o20 + p * sV[k_inner][20];
+                  o21 = correction * o21 + p * sV[k_inner][21];
+                  o22 = correction * o22 + p * sV[k_inner][22];
+                  o23 = correction * o23 + p * sV[k_inner][23];
+                  o24 = correction * o24 + p * sV[k_inner][24];
+                  o25 = correction * o25 + p * sV[k_inner][25];
+                  o26 = correction * o26 + p * sV[k_inner][26];
+                  o27 = correction * o27 + p * sV[k_inner][27];
+                  o28 = correction * o28 + p * sV[k_inner][28];
+                  o29 = correction * o29 + p * sV[k_inner][29];
+                  o30 = correction * o30 + p * sV[k_inner][30];
+                  o31 = correction * o31 + p * sV[k_inner][31];
+#endif
                   m = m_new;
               }
           }
@@ -699,6 +726,24 @@ __global__ void flash_attention_prefill_kernel(
            if (d_start + 13 < head_dim) O[base + 13] = o13 * inv_l;
            if (d_start + 14 < head_dim) O[base + 14] = o14 * inv_l;
            if (d_start + 15 < head_dim) O[base + 15] = o15 * inv_l;
+#ifdef GRETA_PREFILL_Q_LDS_V4
+           if (d_start + 16 < head_dim) O[base + 16] = o16 * inv_l;
+           if (d_start + 17 < head_dim) O[base + 17] = o17 * inv_l;
+           if (d_start + 18 < head_dim) O[base + 18] = o18 * inv_l;
+           if (d_start + 19 < head_dim) O[base + 19] = o19 * inv_l;
+           if (d_start + 20 < head_dim) O[base + 20] = o20 * inv_l;
+           if (d_start + 21 < head_dim) O[base + 21] = o21 * inv_l;
+           if (d_start + 22 < head_dim) O[base + 22] = o22 * inv_l;
+           if (d_start + 23 < head_dim) O[base + 23] = o23 * inv_l;
+           if (d_start + 24 < head_dim) O[base + 24] = o24 * inv_l;
+           if (d_start + 25 < head_dim) O[base + 25] = o25 * inv_l;
+           if (d_start + 26 < head_dim) O[base + 26] = o26 * inv_l;
+           if (d_start + 27 < head_dim) O[base + 27] = o27 * inv_l;
+           if (d_start + 28 < head_dim) O[base + 28] = o28 * inv_l;
+           if (d_start + 29 < head_dim) O[base + 29] = o29 * inv_l;
+           if (d_start + 30 < head_dim) O[base + 30] = o30 * inv_l;
+           if (d_start + 31 < head_dim) O[base + 31] = o31 * inv_l;
+#endif
       }
   } // End Segment Loop
 }

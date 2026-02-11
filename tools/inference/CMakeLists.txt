@@ -70,6 +70,13 @@ if(GRETA_PREFILL_Q_LDS)
     add_definitions(-DGRETA_PREFILL_Q_LDS=1)
 endif()
 
+option(GRETA_PREFILL_Q_LDS_V4 "Enable V4 (Q+V LDS)" OFF)
+if(GRETA_PREFILL_Q_LDS_V4)
+    message(STATUS "GRETA_PREFILL_Q_LDS_V4 enabled (V4)")
+    add_definitions(-DGRETA_PREFILL_Q_LDS=1)
+    add_definitions(-DGRETA_PREFILL_Q_LDS_V4=1)
+endif()
+
 # Add greta_trace_memcpy.hpp include path if tracing enabled
 if(GRETA_TRACE_MEMCPY)
     message(STATUS "GRETA_TRACE_MEMCPY enabled - D2H audit mode")
