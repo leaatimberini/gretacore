@@ -559,7 +559,7 @@ __global__ void flash_attention_prefill_kernel(
     uint32_t seq_len, uint32_t num_heads, uint32_t num_heads_kv,
     uint32_t head_dim, float scale, bool causal) {
 
-  // LDS Layout - Force explicit sizes
+  // LDS Reservation (32x128x4x2 + 32x32x4 = ~36KB)
   __shared__ float sQ[32][128];
   __shared__ float sK[32][128];
   __shared__ float sV[32][PREFILL_SEG];
@@ -576,159 +576,74 @@ __global__ void flash_attention_prefill_kernel(
   if (q_start >= seq_len) return;
   
   uint32_t q_idx = q_start + tid;
-  uint32_t q_end = min(q_start + 32, seq_len);
-  bool valid_q = (q_idx < q_end);
+  bool valid_q = (q_idx < seq_len);
   
-  // 1. Cooperative Load Q into LDS
-  {
-      for (uint32_t col = tid; col < 128; col += 32) {
-          if (q_idx < seq_len) {
-             sQ[tid][col] = Q[q_idx * num_heads * 128 + head * 128 + col];
-          } else {
-             sQ[tid][col] = 0.0f;
-          }
-      }
+  // 1. Load Q into LDS (Full)
+  for (uint32_t col = tid; col < 128; col += 32) {
+      if (valid_q) sQ[tid][col] = Q[q_idx * num_heads * 128 + head * 128 + col];
+      else sQ[tid][col] = 0.0f;
   }
   __syncthreads();
-  
+
   // Outer Loop: Segments of Output
   for (uint32_t d_start = 0; d_start < 128; d_start += PREFILL_SEG) {
       if (d_start >= head_dim) break;
       
-      // Scalar Accumulators
-      float o0=0, o1=0, o2=0, o3=0, o4=0, o5=0, o6=0, o7=0;
-      float o8=0, o9=0, o10=0, o11=0, o12=0, o13=0, o14=0, o15=0;
-#ifdef GRETA_PREFILL_Q_LDS_V4
-      float o16=0, o17=0, o18=0, o19=0, o20=0, o21=0, o22=0, o23=0;
-      float o24=0, o25=0, o26=0, o27=0, o28=0, o29=0, o30=0, o31=0;
-#endif
-      
+      float acc[PREFILL_SEG];
+      for(int i=0; i<PREFILL_SEG; ++i) acc[i] = 0.0f;
       float m = -INFINITY;
       float l = 0.0f;
       
-      uint32_t block_max_k = causal ? q_end : seq_len;
+      uint32_t k_limit = causal ? min(seq_len, q_idx + 1) : seq_len;
       
-      // Inner Loop: K/V blocks
-      for (uint32_t k_start = 0; k_start < block_max_k; k_start += 32) {
-          __syncthreads(); 
+      for (uint32_t k_block = 0; k_block < k_limit; k_block += 32) {
+          // A. Cooperative Load K/V Block
           for (uint32_t col = tid; col < 128; col += 32) {
-              for (uint32_t row = 0; row < 32; row++) {
-                  uint32_t abs_k = k_start + row;
+              for (uint32_t row = 0; row < 32; ++row) {
+                  uint32_t abs_k = k_block + row;
                   if (abs_k < seq_len) sK[row][col] = K[abs_k * num_heads_kv * 128 + kv_head * 128 + col];
                   else sK[row][col] = 0.0f;
               }
           }
-          
-          // Load V (Segment)
           for (uint32_t col = tid; col < PREFILL_SEG; col += 32) {
-              for (uint32_t row = 0; row < 32; row++) {
-                  uint32_t abs_k = k_start + row;
-                  if (abs_k < seq_len && (d_start + col) < head_dim) {
-                      sV[row][col] = V[abs_k * num_heads_kv * 128 + kv_head * 128 + (d_start + col)];
-                  } else {
-                      sV[row][col] = 0.0f;
-                  }
+              for (uint32_t row = 0; row < 32; ++row) {
+                  uint32_t abs_k = k_block + row;
+                  uint32_t abs_d = d_start + col;
+                  if (abs_k < seq_len && abs_d < head_dim) sV[row][col] = V[abs_k * num_heads_kv * 128 + kv_head * 128 + abs_d];
+                  else sV[row][col] = 0.0f;
               }
           }
           __syncthreads();
-          
+
+          // B. Compute Attention in Registers
           if (valid_q) {
-              uint32_t k_end_in_tile = min(FLASH_BLOCK_SIZE, (causal ? (q_idx + 1) : seq_len) - k_start);
-              if (causal && k_start > q_idx) k_end_in_tile = 0;
-              
-              for (uint32_t k_inner = 0; k_inner < k_end_in_tile; ++k_inner) {
+              uint32_t block_end = min(32u, k_limit - k_block);
+              for (uint32_t k = 0; k < block_end; ++k) {
                   float dot = 0.0f;
                   #pragma unroll 16
-                  for(int d=0; d<128; ++d) {
-                      dot += sQ[tid][d] * sK[k_inner][d];
-                  }
+                  for (int c = 0; c < 128; ++c) dot += sQ[tid][c] * sK[k][c];
                   
                   float s = dot * scale;
-                  float m_new = fmaxf(m, s);
-                  float p = expf(s - m_new);
-                  float correction = expf(m - m_new);
-                  l = correction * l + p;
-                   
-                  // Update Accumulators
-                  o0 = correction * o0 + p * sV[k_inner][0];
-                  o1 = correction * o1 + p * sV[k_inner][1];
-                  o2 = correction * o2 + p * sV[k_inner][2];
-                  o3 = correction * o3 + p * sV[k_inner][3];
-                  o4 = correction * o4 + p * sV[k_inner][4];
-                  o5 = correction * o5 + p * sV[k_inner][5];
-                  o6 = correction * o6 + p * sV[k_inner][6];
-                  o7 = correction * o7 + p * sV[k_inner][7];
-                  o8 = correction * o8 + p * sV[k_inner][8];
-                  o9 = correction * o9 + p * sV[k_inner][9];
-                  o10 = correction * o10 + p * sV[k_inner][10];
-                  o11 = correction * o11 + p * sV[k_inner][11];
-                  o12 = correction * o12 + p * sV[k_inner][12];
-                  o13 = correction * o13 + p * sV[k_inner][13];
-                  o14 = correction * o14 + p * sV[k_inner][14];
-                  o15 = correction * o15 + p * sV[k_inner][15];
-#ifdef GRETA_PREFILL_Q_LDS_V4
-                  o16 = correction * o16 + p * sV[k_inner][16];
-                  o17 = correction * o17 + p * sV[k_inner][17];
-                  o18 = correction * o18 + p * sV[k_inner][18];
-                  o19 = correction * o19 + p * sV[k_inner][19];
-                  o20 = correction * o20 + p * sV[k_inner][20];
-                  o21 = correction * o21 + p * sV[k_inner][21];
-                  o22 = correction * o22 + p * sV[k_inner][22];
-                  o23 = correction * o23 + p * sV[k_inner][23];
-                  o24 = correction * o24 + p * sV[k_inner][24];
-                  o25 = correction * o25 + p * sV[k_inner][25];
-                  o26 = correction * o26 + p * sV[k_inner][26];
-                  o27 = correction * o27 + p * sV[k_inner][27];
-                  o28 = correction * o28 + p * sV[k_inner][28];
-                  o29 = correction * o29 + p * sV[k_inner][29];
-                  o30 = correction * o30 + p * sV[k_inner][30];
-                  o31 = correction * o31 + p * sV[k_inner][31];
-#endif
-                  m = m_new;
+                  float m_old = m;
+                  m = fmaxf(m, s);
+                  float p = expf(s - m);
+                  float scale_old = expf(m_old - m);
+                  l = l * scale_old + p;
+                  for (int i = 0; i < PREFILL_SEG; ++i) acc[i] = acc[i] * scale_old + p * sV[k][i];
               }
           }
-      } // End K Loop
-      
-      // Store Output Segment
-      if (valid_q && l > 0.0f) {
-           uint32_t base = q_idx * num_heads * 128 + head * 128 + d_start;
-           float inv_l = 1.0f / l;
-           if (d_start + 0 < head_dim) O[base + 0] = o0 * inv_l;
-           if (d_start + 1 < head_dim) O[base + 1] = o1 * inv_l;
-           if (d_start + 2 < head_dim) O[base + 2] = o2 * inv_l;
-           if (d_start + 3 < head_dim) O[base + 3] = o3 * inv_l;
-           if (d_start + 4 < head_dim) O[base + 4] = o4 * inv_l;
-           if (d_start + 5 < head_dim) O[base + 5] = o5 * inv_l;
-           if (d_start + 6 < head_dim) O[base + 6] = o6 * inv_l;
-           if (d_start + 7 < head_dim) O[base + 7] = o7 * inv_l;
-           if (d_start + 8 < head_dim) O[base + 8] = o8 * inv_l;
-           if (d_start + 9 < head_dim) O[base + 9] = o9 * inv_l;
-           if (d_start + 10 < head_dim) O[base + 10] = o10 * inv_l;
-           if (d_start + 11 < head_dim) O[base + 11] = o11 * inv_l;
-           if (d_start + 12 < head_dim) O[base + 12] = o12 * inv_l;
-           if (d_start + 13 < head_dim) O[base + 13] = o13 * inv_l;
-           if (d_start + 14 < head_dim) O[base + 14] = o14 * inv_l;
-           if (d_start + 15 < head_dim) O[base + 15] = o15 * inv_l;
-#ifdef GRETA_PREFILL_Q_LDS_V4
-           if (d_start + 16 < head_dim) O[base + 16] = o16 * inv_l;
-           if (d_start + 17 < head_dim) O[base + 17] = o17 * inv_l;
-           if (d_start + 18 < head_dim) O[base + 18] = o18 * inv_l;
-           if (d_start + 19 < head_dim) O[base + 19] = o19 * inv_l;
-           if (d_start + 20 < head_dim) O[base + 20] = o20 * inv_l;
-           if (d_start + 21 < head_dim) O[base + 21] = o21 * inv_l;
-           if (d_start + 22 < head_dim) O[base + 22] = o22 * inv_l;
-           if (d_start + 23 < head_dim) O[base + 23] = o23 * inv_l;
-           if (d_start + 24 < head_dim) O[base + 24] = o24 * inv_l;
-           if (d_start + 25 < head_dim) O[base + 25] = o25 * inv_l;
-           if (d_start + 26 < head_dim) O[base + 26] = o26 * inv_l;
-           if (d_start + 27 < head_dim) O[base + 27] = o27 * inv_l;
-           if (d_start + 28 < head_dim) O[base + 28] = o28 * inv_l;
-           if (d_start + 29 < head_dim) O[base + 29] = o29 * inv_l;
-           if (d_start + 30 < head_dim) O[base + 30] = o30 * inv_l;
-           if (d_start + 31 < head_dim) O[base + 31] = o31 * inv_l;
-#endif
+          __syncthreads();
       }
-  } // End Segment Loop
+
+      // C. Store Output Segment
+      if (valid_q && l > 0.0f) {
+          float inv_l = 1.0f / l;
+          for (int i = 0; i < PREFILL_SEG; ++i) {
+              uint32_t abs_d = d_start + i;
+              if (abs_d < head_dim) O[q_idx * num_heads * 128 + head * 128 + abs_d] = acc[i] * inv_l;
+          }
+      }
+  }
 }
 #elif defined(GRETA_PREFILL_SEGMENTED)
 // V1: Full LDS Tiling (Regressions due to Spill)
