@@ -578,10 +578,20 @@ __global__ void flash_attention_prefill_kernel(
   uint32_t q_idx = q_start + tid;
   bool valid_q = (q_idx < seq_len);
   
-  // 1. Load Q into LDS (Full)
-  for (uint32_t col = tid; col < 128; col += 32) {
-      if (valid_q) sQ[tid][col] = Q[q_idx * num_heads * 128 + head * 128 + col];
-      else sQ[tid][col] = 0.0f;
+  // 1. Vectorized Load Q into LDS (Full 128 dim)
+  // Each thread loads 4 floats * 4 iterations = 16 floats. 32 threads * 16 = 512 elements per block.
+  // Wait, 32 threads * 128 elements = 4096 elements.
+  // Each thread loads 128 elements (32 float4 loads).
+  {
+      float4 *sQ4 = (float4*)sQ[tid];
+      const float4 *Q4 = (const float4*)&Q[q_idx * num_heads * 128 + head * 128];
+      if (valid_q) {
+          #pragma unroll
+          for (int i = 0; i < 32; ++i) sQ4[i] = Q4[i];
+      } else {
+          #pragma unroll
+          for (int i = 0; i < 32; ++i) sQ4[i] = make_float4(0,0,0,0);
+      }
   }
   __syncthreads();
 
@@ -590,6 +600,7 @@ __global__ void flash_attention_prefill_kernel(
       if (d_start >= head_dim) break;
       
       float acc[PREFILL_SEG];
+      #pragma unroll
       for(int i=0; i<PREFILL_SEG; ++i) acc[i] = 0.0f;
       float m = -INFINITY;
       float l = 0.0f;
@@ -597,21 +608,33 @@ __global__ void flash_attention_prefill_kernel(
       uint32_t k_limit = causal ? min(seq_len, q_idx + 1) : seq_len;
       
       for (uint32_t k_block = 0; k_block < k_limit; k_block += 32) {
-          // A. Cooperative Load K/V Block
-          for (uint32_t col = tid; col < 128; col += 32) {
-              for (uint32_t row = 0; row < 32; ++row) {
-                  uint32_t abs_k = k_block + row;
-                  if (abs_k < seq_len) sK[row][col] = K[abs_k * num_heads_kv * 128 + kv_head * 128 + col];
-                  else sK[row][col] = 0.0f;
-              }
+          // A. Vectorized Cooperative Load K Block (32 rows x 128 cols)
+          // Each thread loads 32 elements of K (8 float4 loads)
+          #pragma unroll
+          for (int i = 0; i < 4; ++i) {
+              uint32_t sub_idx = i * 32 + tid; // 0..127
+              // Each thread loads 4 rows for its column? No, let's do row-major.
+              // Total elements 32*128 = 4096. 32 threads -> 128 elements each.
           }
-          for (uint32_t col = tid; col < PREFILL_SEG; col += 32) {
-              for (uint32_t row = 0; row < 32; ++row) {
-                  uint32_t abs_k = k_block + row;
-                  uint32_t abs_d = d_start + col;
-                  if (abs_k < seq_len && abs_d < head_dim) sV[row][col] = V[abs_k * num_heads_kv * 128 + kv_head * 128 + abs_d];
-                  else sV[row][col] = 0.0f;
-              }
+          // Correct simple cooperative load (to ensure stability):
+          uint32_t k_flat = 32 * 128;
+          for (uint32_t i = tid; i < k_flat; i += 32) {
+              uint32_t r = i / 128;
+              uint32_t c = i % 128;
+              uint32_t abs_k = k_block + r;
+              if (abs_k < seq_len) sK[r][c] = K[abs_k * num_heads_kv * 128 + kv_head * 128 + c];
+              else sK[r][c] = 0.0f;
+          }
+
+          // B. Cooperative Load V segment (32 rows x PREFILL_SEG cols)
+          uint32_t v_flat = 32 * PREFILL_SEG;
+          for (uint32_t i = tid; i < v_flat; i += 32) {
+              uint32_t r = i / PREFILL_SEG;
+              uint32_t c = i % PREFILL_SEG;
+              uint32_t abs_k = k_block + r;
+              uint32_t abs_d = d_start + c;
+              if (abs_k < seq_len && abs_d < head_dim) sV[r][c] = V[abs_k * num_heads_kv * 128 + kv_head * 128 + abs_d];
+              else sV[r][c] = 0.0f;
           }
           __syncthreads();
 
