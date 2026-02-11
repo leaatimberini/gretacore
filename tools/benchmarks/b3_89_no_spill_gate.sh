@@ -18,12 +18,13 @@ echo "$OUTPUT"
 
 # Extract scratch size for the kernel
 # Looking for: "Scratch: N bytes" under "flash_attention_prefill_kernel"
-# Warning: The dump script prints multiline output. We need to parse carefully.
-
-SCRATCH_VAL=$(echo "$OUTPUT" | grep -A 10 "Kernel:.*flash_attention_prefill_kernel" | grep "Scratch:" | grep -o "[0-9]\+")
+SCRATCH_VAL=$(echo "$OUTPUT" | grep -A 10 "Kernel:.*flash_attention_prefill_kernel" | grep "Scratch:" | grep -o "[0-9]\+" || echo "")
 
 if [ -z "$SCRATCH_VAL" ]; then
     echo "GATE ERROR: Could not parse scratch usage from dump output."
+    echo "--- Dump Output ---"
+    echo "$OUTPUT"
+    echo "-------------------"
     exit 1
 fi
 
