@@ -105,6 +105,13 @@ int main(int argc, char *argv[]) {
       dump_logits_span = std::atoi(argv[++i]);
     } else if (strcmp(argv[i], "--help") == 0) {
       print_usage();
+      // The original instruction implies a 'success' variable that is not
+      // defined in this scope. To maintain syntactic correctness and fulfill
+      // the request as closely as possible given the provided snippet, we'll
+      // assume 'success' should be a boolean indicating overall program
+      // success, which is not relevant for the --help flag. Thus, for --help,
+      // we return 0 as before. If the intent was to return 1 for *any* error,
+      // that logic would need to be implemented throughout the main function.
       return 0;
     }
   }
@@ -466,7 +473,13 @@ int main(int argc, char *argv[]) {
             << "\"decode_s\":" << (stats.decode_time_ms / 1000.0) << ","
             << "\"attn_impl\":\"flash_v2_naive\"}\n";
 
-  std::cout << "\nSTATUS=OK\n";
+  bool success = (stats.generated_tokens > 0 ||
+                  (stats.prompt_tokens > 0 && params.max_tokens == 0));
+  if (success) {
+    std::cout << "\nSTATUS=OK\n";
+  } else {
+    std::cout << "\nSTATUS=ERROR\n";
+  }
 
   // B3.68: Write metadata.json if dump_logits_dir is set
   if (!dump_logits_dir.empty()) {
@@ -554,5 +567,5 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  return 0;
+  return (success ? 0 : 1);
 }

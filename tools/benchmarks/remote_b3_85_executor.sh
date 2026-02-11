@@ -29,7 +29,7 @@ run_config() {
     export GRETA_KV_ALIGNED=1
     export GRETA_SEED=0
     export GRETA_VERBOSE_INFO=1
-    export GRETA_MAX_SEQ_LEN=65536
+    export GRETA_MAX_SEQ_LEN=32768
     
     # Start VRAM sampling
     local VRAM_LOG="$TARGET_OUT/vram_samples.csv"
@@ -45,7 +45,7 @@ run_config() {
     ) &
     VRAM_PID=$!
 
-    local START_TIME=$(date +%s.%N)
+    START_TIME=$(date +%s.%N)
     set +e
     timeout --foreground "$timeout" ./tools/inference/build/greta_infer \
         --model ./models/greta-v1.gguf \
@@ -57,8 +57,8 @@ run_config() {
         --dump-logits-span 0 > "$TARGET_OUT/run.log" 2>&1
     local EXIT_STATUS=$?
     set -e
-    local END_TIME=$(date +%s.%N)
-    local WALL_TIME=$(echo "$END_TIME - $START_TIME" | bc)
+    END_TIME=$(date +%s.%N)
+    WALL_TIME=$(echo "$END_TIME - $START_TIME" | bc)
 
     kill $VRAM_PID || true
 

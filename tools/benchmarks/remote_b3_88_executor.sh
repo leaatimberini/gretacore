@@ -22,7 +22,7 @@ export GRETA_MAX_SEQ_LEN=65536
 # Apply best settings known (if any)
 # export GRETA_USE_FAST_PATH=1 
 
-local START_TIME=$(date +%s.%N)
+START_TIME=$(date +%s.%N)
 set +e
 timeout --foreground "$TIMEOUT" ./tools/inference/build/greta_infer \
     --model ./models/greta-v1.gguf \
@@ -31,8 +31,8 @@ timeout --foreground "$TIMEOUT" ./tools/inference/build/greta_infer \
     --greedy > "$TARGET_OUT/run.log" 2>&1
 EXIT_STATUS=$?
 set -e
-local END_TIME=$(date +%s.%N)
-local WALL_TIME=$(echo "$END_TIME - $START_TIME" | bc)
+END_TIME=$(date +%s.%N)
+WALL_TIME=$(echo "$END_TIME - $START_TIME" | bc)
 
 STATUS_STR="OK"
 if [ $EXIT_STATUS -eq 124 ]; then
