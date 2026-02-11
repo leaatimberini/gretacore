@@ -605,9 +605,15 @@ __global__ void flash_attention_prefill_kernel(
       float m = -INFINITY;
       float l = 0.0f;
       
-      uint32_t k_limit = causal ? min(seq_len, q_idx + 1) : seq_len;
+      // Critical Fix: k_limit must be UNIFORM for the block to avoid deadlock at __syncthreads()
+      // We loop until the end of the sequence or the end of the current Q block
+      uint32_t block_k_limit = seq_len;
+      if (causal) {
+           // For causal, we need to cover up to the max q_idx in this block
+           block_k_limit = min(seq_len, q_start + 32);
+      }
       
-      for (uint32_t k_block = 0; k_block < k_limit; k_block += 32) {
+      for (uint32_t k_block = 0; k_block < block_k_limit; k_block += 32) {
           // A. Minimalistic Cooperative Load K Block
           // We have 32 threads. Each thread loads 4 floats (128/32 = 4)
           for (uint32_t col_pass = 0; col_pass < 4; ++col_pass) {
@@ -636,8 +642,12 @@ __global__ void flash_attention_prefill_kernel(
 
           // B. Compute Attention in Registers
           if (valid_q) {
-              uint32_t block_end = min(32u, k_limit - k_block);
+              uint32_t block_end = min(32u, block_k_limit - k_block);
               for (uint32_t k = 0; k < block_end; ++k) {
+                  uint32_t abs_k = k_block + k;
+                  // Causal check: if abs_k > q_idx, mask it (skip accumulation)
+                  if (causal && abs_k > q_idx) continue;
+                  
                   float dot = 0.0f;
                   #pragma unroll 16
                   for (int c = 0; c < 128; ++c) dot += sQ[tid][c] * sK[k][c];
