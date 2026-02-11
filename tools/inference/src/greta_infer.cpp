@@ -376,6 +376,10 @@ int main(int argc, char *argv[]) {
   std::cout << "Generator initialized\n";
 #ifdef GRETA_PREFILL_LDS_TILING
   std::cout << "[ATTN_PREFILL_OPT] GRETA_PREFILL_LDS_TILING=1" << std::endl;
+#elif defined(GRETA_PREFILL_SEGMENTED)
+  std::cout << "[ATTN_PREFILL_OPT] GRETA_PREFILL_SEGMENTED=1 (V2)" << std::endl;
+#elif defined(GRETA_PREFILL_Q_LDS)
+  std::cout << "[ATTN_PREFILL_OPT] GRETA_PREFILL_Q_LDS=1 (V3)" << std::endl;
 #else
   std::cout << "[ATTN_PREFILL_OPT] GRETA_PREFILL_LDS_TILING=0" << std::endl;
 #endif

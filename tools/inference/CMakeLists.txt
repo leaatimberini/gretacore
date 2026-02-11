@@ -58,6 +58,18 @@ if(GRETA_PREFILL_LDS_TILING)
     add_definitions(-DGRETA_PREFILL_LDS_TILING=1)
 endif()
 
+option(GRETA_PREFILL_SEGMENTED "Enable Segmented Tiling for prefill attention kernel (V2)" OFF)
+if(GRETA_PREFILL_SEGMENTED)
+    message(STATUS "GRETA_PREFILL_SEGMENTED enabled (V2)")
+    add_definitions(-DGRETA_PREFILL_SEGMENTED=1)
+endif()
+
+option(GRETA_PREFILL_Q_LDS "Enable Q-LDS Tiling for prefill attention kernel (V3 - No Spill)" OFF)
+if(GRETA_PREFILL_Q_LDS)
+    message(STATUS "GRETA_PREFILL_Q_LDS enabled (V3)")
+    add_definitions(-DGRETA_PREFILL_Q_LDS=1)
+endif()
+
 # Add greta_trace_memcpy.hpp include path if tracing enabled
 if(GRETA_TRACE_MEMCPY)
     message(STATUS "GRETA_TRACE_MEMCPY enabled - D2H audit mode")
