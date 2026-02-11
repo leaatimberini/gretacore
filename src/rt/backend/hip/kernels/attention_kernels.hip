@@ -540,14 +540,16 @@ void launch_attn_vacc_vsample(hipStream_t stream, const float *V_cache,
 
 
 
-#ifdef GRETA_PREFILL_Q_LDS
-// [V3] Q-in-LDS + Segmented Output to eliminate scratch spilling
-// ... existing V3 code ...
-// (I will need to verify if I can just modify the existing block or duplicate)
-// To keep minimal diff, I will use #if defined(GRETA_PREFILL_Q_LDS) || defined(GRETA_PREFILL_Q_LDS_V4)
-// and inside use #ifdef GRETA_PREFILL_Q_LDS_V4 for the V logic.
+#if defined(GRETA_PREFILL_Q_LDS) || defined(GRETA_PREFILL_Q_LDS_V4)
+
 #define FLASH_BLOCK_SIZE 32
 #define FLASH_HEAD_DIM 128
+
+#ifdef GRETA_PREFILL_Q_LDS_V4
+  #define PREFILL_SEG 32
+#else
+  #define PREFILL_SEG 16
+#endif
 
 __global__ void flash_attention_prefill_kernel(
     const float *__restrict__ Q,      // [seq_len, num_heads, head_dim]
@@ -557,18 +559,10 @@ __global__ void flash_attention_prefill_kernel(
     uint32_t seq_len, uint32_t num_heads, uint32_t num_heads_kv,
     uint32_t head_dim, float scale, bool causal) {
 
-  // LDS Layout
-  __shared__ float sQ[FLASH_BLOCK_SIZE][FLASH_HEAD_DIM];
-  __shared__ float sK[FLASH_BLOCK_SIZE][FLASH_HEAD_DIM];
-  
-#ifdef GRETA_PREFILL_Q_LDS_V4
-  // V4: SEG=32 to reduce K-reloads (128/32 = 4 passes)
-  constexpr int SEG = 32;
-#else
-  // V3: SEG=16 (128/16 = 8 passes)
-  constexpr int SEG = 16;
-#endif
-  __shared__ float sV[FLASH_BLOCK_SIZE][SEG];
+  // LDS Layout - Force explicit sizes
+  __shared__ float sQ[32][128];
+  __shared__ float sK[32][128];
+  __shared__ float sV[32][PREFILL_SEG];
 
   uint32_t head = blockIdx.x;
   uint32_t q_block = blockIdx.y;
@@ -578,31 +572,27 @@ __global__ void flash_attention_prefill_kernel(
   uint32_t group = num_heads / num_heads_kv;
   uint32_t kv_head = (group > 0) ? (head / group) : 0;
   
-  uint32_t q_start = q_block * FLASH_BLOCK_SIZE;
+  uint32_t q_start = q_block * 32;
   if (q_start >= seq_len) return;
   
   uint32_t q_idx = q_start + tid;
-  uint32_t q_end = min(q_start + FLASH_BLOCK_SIZE, seq_len);
+  uint32_t q_end = min(q_start + 32, seq_len);
   bool valid_q = (q_idx < q_end);
   
   // 1. Cooperative Load Q into LDS
   {
-      uint32_t total_elements = FLASH_BLOCK_SIZE * 128;
-      for (uint32_t i = tid; i < total_elements; i += FLASH_BLOCK_SIZE) {
-          uint32_t row = i / 128;
-          uint32_t col = i % 128;
-          uint32_t abs_q = q_start + row;
-          if (abs_q < seq_len) {
-             sQ[row][col] = Q[abs_q * num_heads * 128 + head * 128 + col];
+      for (uint32_t col = tid; col < 128; col += 32) {
+          if (q_idx < seq_len) {
+             sQ[tid][col] = Q[q_idx * num_heads * 128 + head * 128 + col];
           } else {
-             sQ[row][col] = 0.0f;
+             sQ[tid][col] = 0.0f;
           }
       }
   }
   __syncthreads();
   
   // Outer Loop: Segments of Output
-  for (uint32_t d_start = 0; d_start < 128; d_start += SEG) {
+  for (uint32_t d_start = 0; d_start < 128; d_start += PREFILL_SEG) {
       if (d_start >= head_dim) break;
       
       // Scalar Accumulators
@@ -619,29 +609,26 @@ __global__ void flash_attention_prefill_kernel(
       uint32_t block_max_k = causal ? q_end : seq_len;
       
       // Inner Loop: K/V blocks
-      for (uint32_t k_start = 0; k_start < block_max_k; k_start += FLASH_BLOCK_SIZE) {
+      for (uint32_t k_start = 0; k_start < block_max_k; k_start += 32) {
           __syncthreads(); 
-          
-          // Load K (Full)
-          uint32_t k_elems = FLASH_BLOCK_SIZE * 128;
-          for (uint32_t i = tid; i < k_elems; i += FLASH_BLOCK_SIZE) {
-              uint32_t row = i / 128;
-              uint32_t col = i % 128;
-              uint32_t abs_k = k_start + row;
-              uint32_t k_off = abs_k * num_heads_kv * 128 + kv_head * 128 + col;
-              if (abs_k < seq_len) sK[row][col] = K[k_off];
-              else sK[row][col] = 0.0f;
+          for (uint32_t col = tid; col < 128; col += 32) {
+              for (uint32_t row = 0; row < 32; row++) {
+                  uint32_t abs_k = k_start + row;
+                  if (abs_k < seq_len) sK[row][col] = K[abs_k * num_heads_kv * 128 + kv_head * 128 + col];
+                  else sK[row][col] = 0.0f;
+              }
           }
           
           // Load V (Segment)
-          uint32_t v_elems = FLASH_BLOCK_SIZE * SEG;
-          for (uint32_t i = tid; i < v_elems; i += FLASH_BLOCK_SIZE) {
-              uint32_t row = i / SEG;
-              uint32_t col = i % SEG;
-              uint32_t abs_k = k_start + row;
-              uint32_t k_off = abs_k * num_heads_kv * 128 + kv_head * 128 + (d_start + col);
-              if (abs_k < seq_len && (d_start + col) < head_dim) sV[row][col] = V[k_off];
-              else sV[row][col] = 0.0f;
+          for (uint32_t col = tid; col < PREFILL_SEG; col += 32) {
+              for (uint32_t row = 0; row < 32; row++) {
+                  uint32_t abs_k = k_start + row;
+                  if (abs_k < seq_len && (d_start + col) < head_dim) {
+                      sV[row][col] = V[abs_k * num_heads_kv * 128 + kv_head * 128 + (d_start + col)];
+                  } else {
+                      sV[row][col] = 0.0f;
+                  }
+              }
           }
           __syncthreads();
           

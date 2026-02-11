@@ -478,12 +478,21 @@ int main(int argc, char *argv[]) {
   std::cout << "  Tokens/second: " << stats.tokens_per_second << "\n";
 
   // B3.85: Machine-readable timings for RCA
+  std::string attn_tag = "flash_v2_naive";
+#ifdef GRETA_PREFILL_Q_LDS_V4
+  attn_tag = "v4_ql_v_lds";
+#elif defined(GRETA_PREFILL_Q_LDS)
+  attn_tag = "v3_q_lds";
+#elif defined(GRETA_PREFILL_SEGMENTED)
+  attn_tag = "v2_segmented";
+#endif
+
   std::cout << "[PERF_TIMING] {"
             << "\"model_load_s\":" << model_load_s << ","
             << "\"tokenize_s\":" << (stats.tokenize_time_ms / 1000.0) << ","
             << "\"prefill_s\":" << (stats.prefill_time_ms / 1000.0) << ","
             << "\"decode_s\":" << (stats.decode_time_ms / 1000.0) << ","
-            << "\"attn_impl\":\"flash_v2_naive\"}\n";
+            << "\"attn_impl\":\"" << attn_tag << "\"}\n";
 
   bool success = (stats.generated_tokens > 0 ||
                   (stats.prompt_tokens > 0 && params.max_tokens == 0));
