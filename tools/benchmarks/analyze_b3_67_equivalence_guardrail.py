@@ -2366,6 +2366,8 @@ def run_b3_85_analysis(traces_dir_str: str, output_path: str) -> int:
 
     runs.sort(key=lambda x: x.get('context_len', 0))
     
+    report_data = []
+    
     with open(output_path, 'w') as f:
         f.write("# B3.85 Prefill Complexity RCA Report\n\n")
         f.write("| Context | Wall Time (s) | Prefill (s) | Tokenize (s) | Load (s) | Ratio Time/Prev | Verdict |\n")
@@ -2381,16 +2383,27 @@ def run_b3_85_analysis(traces_dir_str: str, output_path: str) -> int:
             ld = r.get('timings', {}).get('model_load_s', 0)
             
             ratio_str = "N/A"
+            ratio_val = None
+            c_ratio = None
             verdict = "OK"
             if last_t and last_t > 0 and last_c:
-                ratio = t / last_t
+                ratio_val = t / last_t
                 c_ratio = c / last_c
-                ratio_str = f"{ratio:.2f}x (c={c_ratio:.1f}x)"
+                ratio_str = f"{ratio_val:.2f}x (c={c_ratio:.1f}x)"
                 # If T_ratio > c_ratio^2 * 1.5, we might have O(N^2+) or extreme overhead
-                if ratio > (c_ratio * c_ratio * 1.5):
+                if ratio_val > (c_ratio * c_ratio * 1.5):
                     verdict = "WARN_EXP"
             
             f.write(f"| {c} | {wall:.2f} | {t:.3f} | {tok:.3f} | {ld:.2f} | {ratio_str} | {verdict} |\n")
+            
+            report_data.append({
+                "context": c,
+                "prefill_s": t,
+                "ratio_to_prev": ratio_val,
+                "c_ratio": c_ratio,
+                "verdict": verdict
+            })
+            
             last_t = t
             last_c = c
         
@@ -2398,6 +2411,19 @@ def run_b3_85_analysis(traces_dir_str: str, output_path: str) -> int:
         f.write("- Perfect $O(N)$ scaling would show ratio = c_ratio\n")
         f.write("- Perfect $O(N^2)$ scaling would show ratio = c_ratio^2 (e.g. 4x for 2x context)\n")
         
+    # Write summary.json
+    summary_path = Path(output_path).parent / "summary.json"
+    summary = {
+        "timestamp": datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
+        "ticket": "B3.85",
+        "global_verdict": "PASS_RCA",
+        "run_count_total": len(runs),
+        "perf_summary": report_data,
+        "prefill_scaling_ratios": [d["ratio_to_prev"] for d in report_data if d["ratio_to_prev"] is not None]
+    }
+    with open(summary_path, 'w') as f:
+        json.dump(summary, f, indent=2)
+
     print(f"Report written to: {output_path}")
     return 0
 
@@ -2407,6 +2433,7 @@ def run_b3_86_analysis(traces_dir_str: str, output_path: str) -> int:
     config, runs = load_b3_76_runs(traces_dir)
     if not runs: return 1
 
+    report_data = []
     with open(output_path, 'w') as f:
         f.write("# B3.86 Attention Implementation Probe\n\n")
         f.write("| Context | Requested Impl | Active Impl | Prefill Time (s) | VRAM (MB) |\n")
@@ -2418,7 +2445,27 @@ def run_b3_86_analysis(traces_dir_str: str, output_path: str) -> int:
             t = r.get('timings', {}).get('prefill_s', 0)
             v = r.get('peak_vram_mb', 0)
             f.write(f"| {c} | {req} | {act} | {t:.3f} | {v:.0f} |\n")
+            report_data.append({
+                "context": c,
+                "requested_impl": req,
+                "active_impl": act,
+                "prefill_s": t,
+                "vram_mb": v
+            })
             
+    # Write summary.json
+    summary_path = Path(output_path).parent / "summary.json"
+    summary = {
+        "timestamp": datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
+        "ticket": "B3.86",
+        "global_verdict": "PASS_PROBE",
+        "run_count_total": len(runs),
+        "attn_impls": list(set([d["active_impl"] for d in report_data])),
+        "perf_summary": report_data
+    }
+    with open(summary_path, 'w') as f:
+        json.dump(summary, f, indent=2)
+
     print(f"Report written to: {output_path}")
     return 0
 
@@ -2428,6 +2475,10 @@ def run_b3_87_analysis(traces_dir_str: str, output_path: str) -> int:
     config, runs = load_b3_76_runs(traces_dir)
     if not runs: return 1
 
+    tps_on = []
+    tps_off = []
+    report_data = []
+    
     with open(output_path, 'w') as f:
         f.write("# B3.87 Decode TPS Decomposition\n\n")
         f.write("| Batch | Determinism | Tokens/s | Decode Time (s) | Load (s) | Overhead |\n")
@@ -2441,6 +2492,38 @@ def run_b3_87_analysis(traces_dir_str: str, output_path: str) -> int:
             overhead = r.get('wall_time_sec', 0) - dec - ld
             f.write(f"| {b} | {det} | {tps:.2f} | {dec:.2f} | {ld:.2f} | {overhead:.2f} |\n")
             
+            if b == 1:
+                if det == 'on': tps_on.append(tps)
+                else: tps_off.append(tps)
+                
+            report_data.append({
+                "batch": b,
+                "deterministic": det,
+                "tps": tps,
+                "decode_s": dec,
+                "model_load_s": ld,
+                "overhead_s": overhead
+            })
+            
+    tps_on_val = statistics.mean(tps_on) if tps_on else 0
+    tps_off_val = statistics.mean(tps_off) if tps_off else 0
+    delta_pct = (tps_on_val - tps_off_val) / tps_off_val * 100 if tps_off_val > 0 else 0
+
+    # Write summary.json
+    summary_path = Path(output_path).parent / "summary.json"
+    summary = {
+        "timestamp": datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
+        "ticket": "B3.87",
+        "global_verdict": "PASS_RCA",
+        "run_count_total": len(runs),
+        "tps_on": tps_on_val,
+        "tps_off": tps_off_val,
+        "delta_pct": delta_pct,
+        "perf_summary": report_data
+    }
+    with open(summary_path, 'w') as f:
+        json.dump(summary, f, indent=2)
+
     print(f"Report written to: {output_path}")
     return 0
 
@@ -2450,6 +2533,9 @@ def run_b3_88_analysis(traces_dir_str: str, output_path: str) -> int:
     config, runs = load_b3_76_runs(traces_dir)
     if not runs: return 1
 
+    report_data = []
+    global_verdict = "FAIL"
+    
     with open(output_path, 'w') as f:
         f.write("# B3.88 32k Feasibility Milestone\n\n")
         for r in runs:
@@ -2461,11 +2547,78 @@ def run_b3_88_analysis(traces_dir_str: str, output_path: str) -> int:
             f.write(f"- **Status:** {st}\n")
             f.write(f"- **Wall Time:** {t:.2f} s\n")
             f.write(f"- **Prefill Time:** {pref:.2f} s\n")
+            
+            report_data.append({
+                "context": c,
+                "status": st,
+                "wall_time_s": t,
+                "prefill_s": pref
+            })
+            
             if st == "OK" and c == 32768:
                 f.write("\n**VERDICT: PASS** - 32k feasibility achieved!\n")
+                global_verdict = "PASS_32K_FEASIBLE"
             elif c == 32768:
                 f.write("\n**VERDICT: FAIL** - 32k mission incomplete.\n")
                 
+    # Write summary.json
+    summary_path = Path(output_path).parent / "summary.json"
+    summary = {
+        "timestamp": datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
+        "ticket": "B3.88",
+        "global_verdict": global_verdict,
+        "run_count_total": len(runs),
+        "perf_summary": report_data
+    }
+    with open(summary_path, 'w') as f:
+        json.dump(summary, f, indent=2)
+
+    print(f"Report written to: {output_path}")
+    return 0
+
+def run_b3_89_analysis(traces_dir_str: str, output_path: str) -> int:
+    traces_dir = Path(traces_dir_str)
+    print(f"[B3.89] Loading prefill microbench runs from: {traces_dir}")
+    config, runs = load_b3_76_runs(traces_dir)
+    if not runs: return 1
+
+    runs.sort(key=lambda x: x.get('context_len', 0))
+    
+    report_data = []
+    
+    with open(output_path, 'w') as f:
+        f.write("# B3.89 Prefill Kernel microbench Report\n\n")
+        f.write("| Context | Prefill (s) | Target (s) | Improvement |\n")
+        f.write("|---|---|---|---|\n")
+        
+        for r in runs:
+            c = r.get('context_len', 0)
+            t = r.get('timings', {}).get('prefill_s', 0)
+            
+            target = 600.0 if c == 32768 else (600.0 * (c/32768)**2)
+            improvement = "N/A"
+            # Here we would compare against B3.88 baseline if available
+            
+            f.write(f"| {c} | {t:.3f} | {target:.3f} | {improvement} |\n")
+            
+            report_data.append({
+                "context": c,
+                "prefill_s": t,
+                "target_s": target
+            })
+            
+    # Write summary.json
+    summary_path = Path(output_path).parent / "summary.json"
+    summary = {
+        "timestamp": datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
+        "ticket": "B3.89",
+        "global_verdict": "PLAN_READY",
+        "run_count_total": len(runs),
+        "perf_summary": report_data
+    }
+    with open(summary_path, 'w') as f:
+        json.dump(summary, f, indent=2)
+
     print(f"Report written to: {output_path}")
     return 0
 
@@ -2485,8 +2638,8 @@ def main():
                         help='Expected seeds (comma-separated)')
     parser.add_argument('--kv-aligned', type=str, default='0,1',
                         help='Expected kv_aligned values (comma-separated)')
-    parser.add_argument('--mode', type=str, default='b3_67', choices=['b3_67', 'b3_69', 'b3_70_71_72', 'b3_73', 'b3_74', 'b3_75', 'b3_76', 'b3_77', 'b3_78_80', 'b3_81', 'b3_82_84', 'b3_85', 'b3_86', 'b3_87', 'b3_88'],
-                        help='Analysis mode: b3_67 (metadata), b3_69 (logits), b3_70+ (sweep), b3_73 (reconcile), b3_74 (internal), b3_75 (CI), b3_76 (pressure), b3_77 (32k), b3_78_80 (suite), b3_81 (batch), b3_82_84 (steady), b3_85 (prefill_rca), b3_86 (attn_probe), b3_87 (decode_rca), b3_88 (32k_milestone)')
+    parser.add_argument('--mode', type=str, default='b3_67', choices=['b3_67', 'b3_69', 'b3_70_71_72', 'b3_73', 'b3_74', 'b3_75', 'b3_76', 'b3_77', 'b3_78_80', 'b3_81', 'b3_82_84', 'b3_85', 'b3_86', 'b3_87', 'b3_88', 'b3_89'],
+                        help='Analysis mode: b3_67 (metadata), b3_69 (logits), b3_70+ (sweep), b3_73 (reconcile), b3_74 (internal), b3_75 (CI), b3_76 (pressure), b3_77 (32k), b3_78_80 (suite), b3_81 (batch), b3_82_84 (steady), b3_85 (prefill_rca), b3_86 (attn_probe), b3_87 (decode_rca), b3_88 (32k_milestone), b3_89 (microbench)')
     
     args = parser.parse_args()
     
@@ -2540,6 +2693,10 @@ def main():
     # B3.88 32k feasibility milestone
     if args.mode == 'b3_88':
         return run_b3_88_analysis(args.traces_dir, args.output)
+
+    # B3.89 prefill microbench
+    if args.mode == 'b3_89':
+        return run_b3_89_analysis(args.traces_dir, args.output)
     
     # B3.74 internal audit mode
     if args.mode == 'b3_74':
