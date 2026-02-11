@@ -105,23 +105,44 @@ done
 echo "DONE_REMOTE_B3_89"
 EOF
 
-scp -o StrictHostKeyChecking=no /tmp/remote_vars.sh root@$HOST:/tmp/remote_vars.sh
-scp -o StrictHostKeyChecking=no /tmp/remote_b3_89_executor.sh root@$HOST:/tmp/remote_b3_89_executor.sh
-ssh -o StrictHostKeyChecking=no root@$HOST "chmod +x /tmp/remote_b3_89_executor.sh"
-ssh -o StrictHostKeyChecking=no root@$HOST "nohup /tmp/remote_b3_89_executor.sh > /tmp/b3_89.log 2>&1 &"
+SSH_OPTS="-o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=10 -o ConnectTimeout=30"
 
-if [ "$SINGLE_SHOT" == "true" ]; then
+run_remote() {
+    local cmd=$1
+    local retries=5
+    local count=0
+    while [ $count -lt $retries ]; do
+        if eval "$cmd"; then
+            return 0
+        fi
+        count=$((count + 1))
+        echo "Command FAILED: $cmd. Retry $count/$retries..."
+        sleep 10
+    done
+    return 1
+}
+
+if [ "${SINGLE_SHOT:-false}" != "true" ]; then
+    run_remote "cat /tmp/remote_vars.sh | ssh $SSH_OPTS root@$HOST \"cat > /tmp/remote_vars.sh\""
+    run_remote "cat /tmp/remote_b3_89_executor.sh | ssh $SSH_OPTS root@$HOST \"cat > /tmp/remote_b3_89_executor.sh\""
+    run_remote "ssh $SSH_OPTS root@$HOST \"chmod +x /tmp/remote_b3_89_executor.sh\""
+    run_remote "ssh $SSH_OPTS root@$HOST \"nohup /tmp/remote_b3_89_executor.sh > /tmp/b3_89.log 2>&1 &\""
+else
     echo "Uploading executor script..."
-    scp -o StrictHostKeyChecking=no tools/benchmarks/remote_b3_89_executor.sh root@$HOST:/tmp/remote_b3_89_executor.sh
-    ssh -o StrictHostKeyChecking=no root@$HOST "chmod +x /tmp/remote_b3_89_executor.sh"
+    run_remote "cat tools/benchmarks/remote_b3_89_executor.sh | ssh $SSH_OPTS root@$HOST \"cat > /tmp/remote_b3_89_executor.sh\""
+    run_remote "ssh $SSH_OPTS root@$HOST \"chmod +x /tmp/remote_b3_89_executor.sh\""
     
-    # Run the executor remotely
+    # Run the executor remotely with retries
     echo "Running single-shot execution..."
-    ssh -o StrictHostKeyChecking=no root@$HOST "bash /tmp/remote_b3_89_executor.sh '$DATE' '$VARIANTS' '$CONTEXTS' '$REPEATS'"
+    run_remote "ssh $SSH_OPTS root@$HOST \"bash /tmp/remote_b3_89_executor.sh '$DATE' '$VARIANTS' '$CONTEXTS' '$REPEATS'\""
     
     # Fetch artifacts
     echo "Fetching artifacts..."
-    scp -r -o StrictHostKeyChecking=no root@$HOST:/root/gretacore/artifacts_remote/$DATE/b3_89 artifacts_remote/$DATE/
+    # We still need SCP for recursive directory fetch, but maybe we can tar it
+    run_remote "ssh $SSH_OPTS root@$HOST \"cd /root/gretacore && tar -czf /tmp/b3_89_artifacts.tar.gz artifacts_remote/$DATE/b3_89\""
+    run_remote "ssh $SSH_OPTS root@$HOST \"cat /tmp/b3_89_artifacts.tar.gz\" | cat > /tmp/b3_89_artifacts.tar.gz"
+    mkdir -p artifacts_remote/$DATE/
+    tar -xzf /tmp/b3_89_artifacts.tar.gz -C artifacts_remote/$DATE/ || true
     
     echo "Artifacts fetched to artifacts_remote/$DATE/"
     exit 0

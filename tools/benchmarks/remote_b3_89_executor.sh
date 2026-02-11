@@ -95,9 +95,25 @@ for VARIANT in "${VAR_LIST[@]}"; do
         
         for i in $(seq 0 $((REPS-1))); do
             OUT_DIR="$RUN_ROOT/${VARIANT}/ctx_${CTX}_run${i}"
+            if [ -f "$OUT_DIR/perf.json" ] && [ "${FORCE:-0}" != "1" ]; then
+                echo "  Run $i already exists, skipping..."
+                continue
+            fi
             mkdir -p "$OUT_DIR"
             
-            echo "  Run $i..."
+            echo "  Run $i (including VRAM sampling)..."
+            
+            # Start VRAM sampling in background
+            rocm-smi --showmeminfo vram --json > "$OUT_DIR/vram_before.json" 2>&1 || true
+            (
+                while true; do
+                    rocm-smi --showmeminfo vram --json >> "$OUT_DIR/vram_samples.jsonl" 2>&1
+                    echo "" >> "$OUT_DIR/vram_samples.jsonl"
+                    sleep 1
+                done
+            ) &
+            SMI_PID=$!
+            
             START=$(date +%s.%N)
             ./$BUILD_DIR/greta_infer \
                 --model ./models/greta-v1.gguf \
@@ -106,6 +122,10 @@ for VARIANT in "${VAR_LIST[@]}"; do
                 --greedy > "$OUT_DIR/run.log" 2>&1
             EXIT_STATUS=$?
             END=$(date +%s.%N)
+            
+            kill $SMI_PID || true
+            rocm-smi --showmeminfo vram --json > "$OUT_DIR/vram_after.json" 2>&1 || true
+            
             WALL=$(echo "$END - $START" | bc)
             
             STATUS_STR="OK"
@@ -163,7 +183,20 @@ for var in variants:
             if ctx not in results[var]: results[var][ctx] = []
             results[var][ctx].append(data)
 
-summary = {"variants": {}, "baseline": baseline_ref, "gate_status": {}}
+summary = {"variants": {}, "baseline": baseline_ref, "gate_status": {}, "resources": {}}
+
+# Extract resources
+for var in ["v3", "v4"]:
+    res_path = os.path.join(run_root, f"{var}_resources.txt")
+    if os.path.exists(res_path):
+        summary["resources"][var] = {}
+        with open(res_path, 'r') as f:
+            lines = f.readlines()
+            for line in lines:
+                if "VGPRs:" in line: summary["resources"][var]["vgpr"] = line.split(":")[1].strip()
+                if "SGPRs:" in line: summary["resources"][var]["sgpr"] = line.split(":")[1].strip()
+                if "LDS:" in line: summary["resources"][var]["lds_bytes"] = line.split(":")[1].strip()
+                if "Scratch:" in line: summary["resources"][var]["scratch_bytes"] = line.split(":")[1].replace("bytes", "").strip()
 
 # Check gate status
 for var in ["v3", "v4"]:
@@ -179,19 +212,30 @@ for var in ["v3", "v4"]:
 for var, contexts in results.items():
     summary["variants"][var] = {}
     for ctx, runs in contexts.items():
-        # Get prefill times. The script outputs 'prefill_s' in perf.json timings
         prefills = []
+        peak_vrams = []
         for r in runs:
             t = r.get("timings", {})
             if "prefill_s" in t:
                 prefills.append(t["prefill_s"])
             else:
-                # Fallback to wall_time if perf_timing missing
                 prefills.append(r.get("wall_time_sec", 0))
+            
+            # Simple peak VRAM heuristic: check vram_after.json
+            ctx_run_dir = os.path.join(run_root, var, f"ctx_{ctx}_run{r['repetition']}")
+            vram_after = os.path.join(ctx_run_dir, "vram_after.json")
+            if os.path.exists(vram_after):
+                try:
+                    with open(vram_after, 'r') as vf:
+                        vjson = json.load(vf)
+                        # SMI json structure varies, usually card_0 or similar
+                        for key in vjson:
+                            if "VRAM" in vjson[key]:
+                                peak_vrams.append(vjson[key]["VRAM Used"])
+                except: pass
         
         if not prefills: continue
         
-        # Repetition policy: skip first if multiple
         data_pts = prefills[1:] if len(prefills) > 1 else prefills
         median_p = sorted(data_pts)[len(data_pts)//2]
         
@@ -200,6 +244,8 @@ for var, contexts in results.items():
             "speedup": baseline_ref.get(ctx, 0) / median_p if median_p > 0 else 0,
             "runs": len(prefills)
         }
+        if peak_vrams:
+            summary["variants"][var][ctx]["peak_vram"] = max(peak_vrams)
 
 # Scaling estimate for v3
 if "v3" in summary["variants"]:

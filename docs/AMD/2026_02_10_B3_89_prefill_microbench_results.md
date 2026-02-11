@@ -54,3 +54,16 @@ Recorded with `GRETA_PREFILL_Q_LDS=1`.
 V3 (Q-LDS) has successfully broken the scratch-spill bottleneck on MI300X, providing the first valid optimized path for long-context prefill. V4 is expected to further improve bandwidth efficiency.
 
 **Decision**: V3 is promoted to experimental status for long-context prefill.
+
+## 8. Connectivity Blocker (2026-02-11)
+- **Status**: **RUN_BLOCKED**
+- **Reason**: Persistent SSH timeouts to MI300X node `129.212.184.200`.
+- **Action**: All infrastructure (single-shot executor, summary analyzer, vram sampling) and code (V3/V4) are merged and verified via local build tests. 
+- **Command Pending**:
+  ```bash
+  bash tools/benchmarks/run_b3_89_prefill_microbench.sh 129.212.184.200 --date 2026-02-11 \
+    --variants "v3,v4" --single-shot \
+    --contexts "4096,8192,16384" \
+    --repeat "4096:2,8192:1,16384:1"
+  ```
+- **Evidence Ready**: V3 (4k) results show **1.21x speedup** and **0 scratch bytes**. 8k/16k and V4 scaling verification requires node restoration.
