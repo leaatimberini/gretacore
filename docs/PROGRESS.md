@@ -119,7 +119,7 @@
 | B3.85 | 2026-02-10 | Prefill Complexity RCA | IN_PROGRESS | READY | TBD | artifacts_remote/2026-02-10/b3_85/ | docs/AMD/2026_02_10_B3_85_prefill_complexity_rca.md |
 | B3.86 | 2026-02-10 | Attn Impl Probe | IN_PROGRESS | READY | TBD | artifacts_remote/2026-02-10/b3_86/ | docs/AMD/2026_02_10_B3_86_attn_impl_probe.md |
 | B3.87 | 2026-02-10 | Decode TPS Decomposition | COMPLETED | PASS (analyzed) | N/A | artifacts_remote/2026-02-10/b3_87/ | docs/AMD/2026_02_10_B3_87_decode_tps_decomposition.md |
-| B3.88 | 2026-02-10 | 32k Feasibility | IN_PROGRESS | READY | TBD | artifacts_remote/2026-02-10/b3_88/ | docs/AMD/2026_02_10_B3_88_32k_feasibility.md |
+| B3.88 | 2026-02-10 | 32k Feasibility | COMPLETED | PASS (1867.19s prefill) | 32k context reached | artifacts_remote/2026-02-10/b3_88/ | docs/AMD/2026_02_10_B3_88_32k_feasibility.md |
 
 ---
 
