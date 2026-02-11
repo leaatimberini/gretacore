@@ -22,6 +22,9 @@ while [[ $# -gt 0 ]]; do
         --determinism) DETERMINISM="$2"; shift 2 ;;
         --tag) TAG="$2"; shift 2 ;;
         --build-dir) BUILD_DIR="$2"; shift 2 ;;
+        --single-shot) SINGLE_SHOT="true"; shift ;;
+        --variants) VARIANTS="$2"; shift 2 ;;
+        --repeat) REPEATS="$2"; shift 2 ;;
         *) if [ -z "$HOST" ]; then HOST="$1"; else echo "Unknown arg: $1"; exit 1; fi; shift ;;
     esac
 done
@@ -107,4 +110,19 @@ scp -o StrictHostKeyChecking=no /tmp/remote_b3_89_executor.sh root@$HOST:/tmp/re
 ssh -o StrictHostKeyChecking=no root@$HOST "chmod +x /tmp/remote_b3_89_executor.sh"
 ssh -o StrictHostKeyChecking=no root@$HOST "nohup /tmp/remote_b3_89_executor.sh > /tmp/b3_89.log 2>&1 &"
 
-echo "Remote microbench started. Monitor with /tmp/b3_89.log"
+if [ "$SINGLE_SHOT" == "true" ]; then
+    echo "Uploading executor script..."
+    scp -o StrictHostKeyChecking=no tools/benchmarks/remote_b3_89_executor.sh root@$HOST:/tmp/remote_b3_89_executor.sh
+    ssh -o StrictHostKeyChecking=no root@$HOST "chmod +x /tmp/remote_b3_89_executor.sh"
+    
+    # Run the executor remotely
+    echo "Running single-shot execution..."
+    ssh -o StrictHostKeyChecking=no root@$HOST "bash /tmp/remote_b3_89_executor.sh '$DATE' '$VARIANTS' '$CONTEXTS' '$REPEATS'"
+    
+    # Fetch artifacts
+    echo "Fetching artifacts..."
+    scp -r -o StrictHostKeyChecking=no root@$HOST:/root/gretacore/artifacts_remote/$DATE/b3_89 artifacts_remote/$DATE/
+    
+    echo "Artifacts fetched to artifacts_remote/$DATE/"
+    exit 0
+fi
