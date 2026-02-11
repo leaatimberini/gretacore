@@ -1,36 +1,32 @@
-# B3.85–B3.88 RCA Unified Summary: MI300X Prefill/Decode Characterization
+# MI300X Prefill/Decode RCA Summary (B3.85–B3.88)
 
 **Date**: 2026-02-10  
-**Status**: Infrastructure Verified / Partial Results  
+**Context**: Hito de escalado a 32k y caracterización de kernels.
 
-## 1. Benchmarking Infrastructure Updates
-The following enhancements were implemented to enable deep performance RCA:
-- **Phase-Level Timing**: Integrated `tokenize_time_ms`, `prefill_time_ms`, and `decode_time_ms` into `GenerationStats`.
-- **Active Kernel Probe**: Added `attn_impl` detection to `greta_infer` output to verify kernel switching.
-- **Scaling Suites**: Created four new automated benchmark suites (B3.85-B3.88) with dedicated remote executors.
+## 1. Context Length Milestone (B3.88)
+- **Logro**: Procesamiento exitoso de **32,768 tokens** en una sola GPU MI300X.
+- **Tiempo**: 2542.79 s.
+- **Veredicto**: **PASS_32K_FEASIBLE**. El motor es capaz de direccionar y computar 32k tokens, superando el límite previo de 2k.
 
-## 2. Identified Bottlenecks & Fixes
+## 2. Prefill Complexity (B3.85)
+Se observó un escalado de tiempo de prefill con tendencia **$O(N^2)$**:
+- 4k -> 8k: 5.2x
+- 8k -> 16k: 4.2x
+- 16k -> 32k: 5.5x (Degradación de eficiencia).
 
-### A. Sequence Length Limit
-- **Issue**: `BlockScheduler` and `ModelConfig` had a hardcoded `max_seq_len` of 2048.
-- **RCA**: Attempting 32k context resulted in `seq_len exceeds GRETA_MAX_SEQ_LEN` crashes.
-- **Fix**: Increased `ModelConfig` default to 32768 and implemented `GRETA_MAX_SEQ_LEN` environment variable override.
+**RCA Técnico**: El kernel `flash_attention_prefill_kernel` es **bandwidth-bound**. Carga repetidamente los mismos bloques de Key/Value desde la memoria global (VRAM) sin aprovechar la memoria compartida (LDS).
 
-### B. ASCII Tokenizer Inflation
-- **Issue**: When loading `.gguf` models, the engine falls back to ASCII tokenization (1 character = 1 token) if SentencePiece is not explicitly configured via `.model` file.
-- **Impact**: A "32k token" prompt (e.g., repeating "hello ") actually generated ~196k tokens, vastly exceeding even the increased memory limits.
-- **Fix**: Benchmark scripts updated to use exact character counts (e.g., `a * 32767`) to simulate precise token counts in fallback mode.
+## 3. Decode Performance (B3.87)
+El uso de flags de determinismo estricto (`HIP_LAUNCH_BLOCKING=1`) penaliza el rendimiento de decode en un **~11.1%**.
+- Sin determinismo: 19.57 TPS.
+- Con determinismo: 17.40 TPS.
 
-## 3. Preliminary Performance Data (B3.87)
+## 4. Attention Implementation (B3.86)
+- **Implementación Detectada**: `flash_v2_naive`.
+- **Estado**: Funcional pero no optimizada para el ancho de banda masivo de las MI300X.
 
-| Metric | Nominal (Det Off) | Strict (Det On) | Impact |
-|--------|-------------------|-----------------|--------|
-| Decode TPS | 19.57 | 17.40 | -11.1% |
-| Wall Time (128t) | 28.19s | 28.93s | +2.6% |
-
-- **Observation**: Strict determinism adds measurable overhead in the decode phase, likely due to serialized atomic operations in HIP kernels.
-
-## 4. Next Steps
-1. **Stabilize Remote Node**: Address intermittent SSH connectivity on `129.212.184.200`.
-2. **Execute 32k Feasibility (B3.88)**: Re-run with the `MAX_SEQ_LEN` and prompt inflation fixes.
-3. **Complexity Analysis**: Run B3.85 to confirm if prefill scaling remains $O(N^2)$ or if recent optimizations improved it to $O(N)$.
+## 5. Next Milestone: B3.89
+Se ha iniciado el plan de optimización enfocado en:
+- Implementación de **tiling** de bloques en LDS.
+- Reducción de lecturas globales por un factor de 64x.
+- Objetivo: Reducir el prefill de 32k de 42 minutos a **menos de 10 minutos**.
