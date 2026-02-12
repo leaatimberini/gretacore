@@ -125,6 +125,7 @@ for VARIANT in "${VAR_LIST[@]}"; do
             
             # Allow failure to capture log
             set +e
+            START=$(date +%s.%N)
             ./$BUILD_DIR/greta_infer \
                 --model ./models/greta-v1.gguf \
                 --prompt-file /tmp/prompt.txt \
