@@ -67,3 +67,11 @@ V3 (Q-LDS) has successfully broken the scratch-spill bottleneck on MI300X, provi
     --repeat "4096:2,8192:1,16384:1"
   ```
 - **Evidence Ready**: V3 (4k) results show **1.21x speedup** and **0 scratch bytes**. 8k/16k and V4 scaling verification requires node restoration.
+
+## 9. Run Robustness Fix (2026-02-11)
+- **Issue**: Previous runs reported 0s prefill time due to silent context length mismatch (`model_config.hpp` fixed at 2048).
+- **Fix**:
+  1. **Force Patch**: Remote executor now sed-patches `model_config.hpp` to 32768 before build.
+  2. **Verification**: Script aborts if patch fails.
+  3. **Guardrails**: Runs with 0s prefill are marked as FAIL.
+- **Status**: Infrastructure patched. Ready for definitive 16k run.

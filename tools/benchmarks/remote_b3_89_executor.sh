@@ -40,12 +40,19 @@ get_reps() {
 # Force 32k context in model config
 echo "Patching model_config.hpp for 32k context..."
 CONFIG_H="src/inference/include/gcore/inference/model_config.hpp"
-if [ -f "$CONFIG_H" ]; then
-    sed -i 's/max_seq_len = [0-9]\+/max_seq_len = 32768/g' "$CONFIG_H"
-    echo "Config Max Seq Len:"
-    grep "max_seq_len =" "$CONFIG_H"
+if [ ! -f "$CONFIG_H" ]; then
+    echo "ERROR: $CONFIG_H not found! Cannot patch context length."
+    exit 1
+fi
+
+sed -i 's/max_seq_len = [0-9]\+/max_seq_len = 32768/g' "$CONFIG_H"
+
+if grep -q "max_seq_len = 32768" "$CONFIG_H"; then
+    echo "SUCCESS: model_config.hpp patched to 32768."
 else
-    echo "WARNING: $CONFIG_H not found!"
+    echo "ERROR: Failed to patch model_config.hpp!"
+    grep "max_seq_len =" "$CONFIG_H"
+    exit 1
 fi
 
 IFS=',' read -ra VAR_LIST <<< "$VARIANTS"
@@ -73,6 +80,11 @@ for VARIANT in "${VAR_LIST[@]}"; do
     cmake .. $CMAKE_FLAGS > build.log 2>&1
     if make -j$(nproc) >> build.log 2>&1; then
         touch build_passed.flag
+        if [ ! -f "greta_infer" ]; then
+            echo "ERROR: Binary greta_infer not found after successful make!"
+            popd > /dev/null
+            exit 1
+        fi
     else
         echo "BUILD FAILED for $VARIANT. Check build.log"
         cat build.log
@@ -156,6 +168,18 @@ for VARIANT in "${VAR_LIST[@]}"; do
             fi
             
             TIMINGS=$(grep "\[PERF_TIMING\]" "$OUT_DIR/run.log" | sed 's/\[PERF_TIMING\] //' || echo "{}")
+            
+            # Guardrail: Check for silent failure (0 prefill or missing json)
+            if [ -z "$TIMINGS" ] || [ "$TIMINGS" == "{}" ]; then
+                 echo "CRITICAL: Missing performance timings in run log!"
+                 STATUS_STR="FAIL"
+            elif echo "$TIMINGS" | grep -q '"prefill_s":0'; then
+                 echo "CRITICAL: Silent failure detected (prefill_s: 0)!"
+                 # Dump log for debugging
+                 echo "--- RUN LOG TAIL ---"
+                 tail -n 20 "$OUT_DIR/run.log"
+                 STATUS_STR="FAIL"
+            fi
             
             cat > "$OUT_DIR/perf.json" << EOT
 {
