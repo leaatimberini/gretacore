@@ -122,6 +122,11 @@ for VARIANT in "${VAR_LIST[@]}"; do
         # Generate Prompt
         python3 -c "print('a' * ($CTX - 1))" > /tmp/prompt.txt
         
+        # Set GRETA_MAX_SEQ_LEN to the context length being tested (or larger if needed)
+        # Use CTX as the limit since we're testing that specific context size
+        export GRETA_MAX_SEQ_LEN="$CTX"
+        echo "GRETA_MAX_SEQ_LEN=$GRETA_MAX_SEQ_LEN"
+        
         for i in $(seq 0 $((REPS-1))); do
             OUT_DIR="$RUN_ROOT/${VARIANT}/ctx_${CTX}_run${i}"
             if [ -f "$OUT_DIR/perf.json" ] && grep -q '"exit_status": "OK"' "$OUT_DIR/perf.json" && [ "${FORCE:-0}" != "1" ]; then
@@ -158,14 +163,18 @@ for VARIANT in "${VAR_LIST[@]}"; do
             kill $SMI_PID || true
             rocm-smi --showmeminfo vram --json > "$OUT_DIR/vram_after.json" 2>&1 || true
             
-            WALL=$(echo "$END - $START" | bc)
+            WALL=$(echo "$(date +%s.%N) - $START" | bc)
             
             STATUS_STR="OK"
             if [ $EXIT_STATUS -ne 0 ]; then 
                 STATUS_STR="FAIL"
-                echo "CRITICAL: Run $i crashed (Exit $EXIT_STATUS). Log tail:"
-                tail -n 50 "$OUT_DIR/run.log"
+                echo "CRITICAL: Run $i crashed (Exit $EXIT_STATUS)"
+                tail -n 30 "$OUT_DIR/run.log"
             fi
+            
+            # Check for prompt tokens in log
+            PROMPT_TOKENS=$(grep "Prompt tokens:" "$OUT_DIR/run.log" | sed 's/.*Prompt tokens: //' | sed 's/ .*//' || echo "NOT_FOUND")
+            echo "  Prompt tokens: $PROMPT_TOKENS"
             
             TIMINGS=$(grep "\[PERF_TIMING\]" "$OUT_DIR/run.log" | sed 's/\[PERF_TIMING\] //' || echo "{}")
             
@@ -175,7 +184,6 @@ for VARIANT in "${VAR_LIST[@]}"; do
                  STATUS_STR="FAIL"
             elif echo "$TIMINGS" | grep -q '"prefill_s":0'; then
                  echo "CRITICAL: Silent failure detected (prefill_s: 0)!"
-                 # Dump log for debugging
                  echo "--- RUN LOG TAIL ---"
                  tail -n 20 "$OUT_DIR/run.log"
                  STATUS_STR="FAIL"
