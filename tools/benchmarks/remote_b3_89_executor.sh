@@ -122,9 +122,9 @@ for VARIANT in "${VAR_LIST[@]}"; do
         # Generate Prompt
         python3 -c "print('a' * ($CTX - 1))" > /tmp/prompt.txt
         
-        # Set GRETA_MAX_SEQ_LEN to the context length being tested (or larger if needed)
-        # Use CTX as the limit since we're testing that specific context size
-        export GRETA_MAX_SEQ_LEN="$CTX"
+        # Set GRETA_MAX_SEQ_LEN to CTX+1 to account for tokenization overhead
+        # The tokenizer produces CTX tokens for (CTX-1) chars (1 token per char + 1 extra)
+        export GRETA_MAX_SEQ_LEN=$((CTX + 1))
         echo "GRETA_MAX_SEQ_LEN=$GRETA_MAX_SEQ_LEN"
         
         for i in $(seq 0 $((REPS-1))); do
