@@ -289,6 +289,8 @@ int main(int argc, char *argv[]) {
 
   // Initialize scheduler
   std::cout << "[GRETA_MAIN] Initializing scheduler..." << std::endl;
+  std::cout << "[GRETA_MAIN] DEBUG: config.max_seq_len = " << config.max_seq_len
+            << std::endl;
   gcore::inference::BlockScheduler scheduler;
   if (!scheduler.init(config, &err)) {
     std::cerr << "Scheduler init failed: " << err << "\n";
