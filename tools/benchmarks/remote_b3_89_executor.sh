@@ -55,33 +55,42 @@ for VARIANT in "${VAR_LIST[@]}"; do
     fi
     
     # Build
-    echo "Building $VARIANT in $BUILD_DIR..."
-    pushd "$BUILD_DIR" > /dev/null
-    rm -f CMakeCache.txt
-    cmake .. $CMAKE_FLAGS > build.log 2>&1
-    make -j$(nproc) >> build.log 2>&1
-    if [ $? -ne 0 ]; then
-        echo "BUILD FAILED for $VARIANT. Check build.log"
-        cat build.log
+    if [ -f "$BUILD_DIR/greta_infer" ] && [ -f "$BUILD_DIR/build_passed.flag" ] && [ "${FORCE:-0}" != "1" ]; then
+        echo "Build for $VARIANT already exists, skipping..."
+    else
+        echo "Building $VARIANT in $BUILD_DIR..."
+        pushd "$BUILD_DIR" > /dev/null
+        rm -f CMakeCache.txt
+        cmake .. $CMAKE_FLAGS > build.log 2>&1
+        if make -j$(nproc) >> build.log 2>&1; then
+            touch build_passed.flag
+        else
+            echo "BUILD FAILED for $VARIANT. Check build.log"
+            cat build.log
+            popd > /dev/null
+            continue
+        fi
         popd > /dev/null
-        continue
     fi
-    popd > /dev/null
     
     # Resource Dump & Gate (Only for opt variants)
     if [ "$VARIANT" != "baseline" ]; then
-        echo "Running No-Spill Gate for $VARIANT..."
-        chmod +x tools/benchmarks/b3_89_no_spill_gate.sh
-        tools/benchmarks/b3_89_no_spill_gate.sh "$CMAKE_FLAGS" > "$RUN_ROOT/${VARIANT}_gate.log" 2>&1
-        EXIT_CODE=$?
-        cat "$RUN_ROOT/${VARIANT}_gate.log"
-        if [ $EXIT_CODE -ne 0 ]; then
-            echo "GATE FAILED for $VARIANT. Skipping execution."
-            continue
+        if [ -f "$RUN_ROOT/${VARIANT}_gate_passed.flag" ] && [ "${FORCE:-0}" != "1" ]; then
+            echo "Gate for $VARIANT already passed, skipping..."
+        else
+            echo "Running No-Spill Gate for $VARIANT..."
+            chmod +x tools/benchmarks/b3_89_no_spill_gate.sh
+            if tools/benchmarks/b3_89_no_spill_gate.sh "$CMAKE_FLAGS" > "$RUN_ROOT/${VARIANT}_gate.log" 2>&1; then
+                touch "$RUN_ROOT/${VARIANT}_gate_passed.flag"
+            else
+                echo "GATE FAILED for $VARIANT. Skipping execution."
+                cat "$RUN_ROOT/${VARIANT}_gate.log"
+                continue
+            fi
+            
+            # Save resource dump
+            tools/benchmarks/b3_89_dump_kernel_resources.sh "$CMAKE_FLAGS" > "$RUN_ROOT/${VARIANT}_resources.txt"
         fi
-        
-        # Save resource dump
-        tools/benchmarks/b3_89_dump_kernel_resources.sh "$CMAKE_FLAGS" > "$RUN_ROOT/${VARIANT}_resources.txt"
     fi
     
     # Execute Contexts
@@ -114,13 +123,15 @@ for VARIANT in "${VAR_LIST[@]}"; do
             ) &
             SMI_PID=$!
             
-            START=$(date +%s.%N)
+            # Allow failure to capture log
+            set +e
             ./$BUILD_DIR/greta_infer \
                 --model ./models/greta-v1.gguf \
                 --prompt-file /tmp/prompt.txt \
                 --max-tokens 1 \
                 --greedy > "$OUT_DIR/run.log" 2>&1
             EXIT_STATUS=$?
+            set -e
             END=$(date +%s.%N)
             
             kill $SMI_PID || true
@@ -129,7 +140,11 @@ for VARIANT in "${VAR_LIST[@]}"; do
             WALL=$(echo "$END - $START" | bc)
             
             STATUS_STR="OK"
-            if [ $EXIT_STATUS -ne 0 ]; then STATUS_STR="FAIL"; fi
+            if [ $EXIT_STATUS -ne 0 ]; then 
+                STATUS_STR="FAIL"
+                echo "CRITICAL: Run $i crashed (Exit $EXIT_STATUS). Log tail:"
+                tail -n 50 "$OUT_DIR/run.log"
+            fi
             
             TIMINGS=$(grep "\[PERF_TIMING\]" "$OUT_DIR/run.log" | sed 's/\[PERF_TIMING\] //' || echo "{}")
             
@@ -163,7 +178,7 @@ if not os.path.exists(run_root):
     print(json.dumps({"error": "run_root not found"}))
     exit(0)
 
-variants = [d for d in os.listdir(run_root) if os.path.isdir(os.path.join(run_root, d))]
+variants = [d for d in os.listdir(run_root) if os.path.isdir(os.path.join(run_root, d)) and d != "runs"]
 
 for var in variants:
     results[var] = {}
@@ -222,7 +237,8 @@ for var, contexts in results.items():
                 prefills.append(r.get("wall_time_sec", 0))
             
             # Simple peak VRAM heuristic: check vram_after.json
-            ctx_run_dir = os.path.join(run_root, var, f"ctx_{ctx}_run{r['repetition']}")
+            rep_idx = r.get('repetition', 0)
+            ctx_run_dir = os.path.join(run_root, var, f"ctx_{ctx}_run{rep_idx}")
             vram_after = os.path.join(ctx_run_dir, "vram_after.json")
             if os.path.exists(vram_after):
                 try:

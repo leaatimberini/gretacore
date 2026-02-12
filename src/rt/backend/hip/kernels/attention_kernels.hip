@@ -584,16 +584,16 @@ __global__ void flash_attention_prefill_kernel(
   uint32_t q_idx = q_start + tid;
   bool valid_q = (q_idx < seq_len);
   
-  // 1. Vectorized Load Q into LDS (Full 128 dim)
-  {
-      float4 *sQ4 = (float4*)sQ_ptr;
-      const float4 *Q4 = (const float4*)&Q[q_idx * num_heads * 128 + head * 128];
-      if (valid_q) {
-          #pragma unroll
-          for (int i = 0; i < 32; ++i) sQ4[tid * 32 + i] = Q4[i]; // Correct offset: row tid
-      } else {
-          #pragma unroll
-          for (int i = 0; i < 32; ++i) sQ4[tid * 32 + i] = make_float4(0,0,0,0);
+  // 1. Cooperative Load Q into LDS (Safe Scalar Mode)
+  for (uint32_t r = 0; r < 32; ++r) {
+      uint32_t abs_q = q_start + r;
+      bool row_valid = (abs_q < seq_len);
+      const float *Q_row = Q + abs_q * num_heads * 128 + head * 128;
+      
+      for (uint32_t c_base = 0; c_base < 128; c_base += 32) {
+          uint32_t c = c_base + tid;
+          if (row_valid) SQ(r, c) = Q_row[c];
+          else SQ(r, c) = 0.0f;
       }
   }
   __syncthreads();
