@@ -188,8 +188,10 @@ int main(int argc, char *argv[]) {
     config = loader->get_config();
     if (config.num_heads_kv == 0)
       config.num_heads_kv = config.num_heads;
-    if (config.num_heads > 0)
-      config.head_dim = config.dim / config.num_heads;
+    config.head_dim = config.dim / config.num_heads;
+
+    // PATCH B3.89: Force max sequence length to support large context
+    config.max_seq_len = 32768; // Override GGUF limit if any
   }
 
   // =========================================================================
