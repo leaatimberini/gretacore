@@ -55,23 +55,20 @@ for VARIANT in "${VAR_LIST[@]}"; do
     fi
     
     # Build
-    if [ -f "$BUILD_DIR/greta_infer" ] && [ -f "$BUILD_DIR/build_passed.flag" ] && [ "${FORCE:-0}" != "1" ]; then
-        echo "Build for $VARIANT already exists, skipping..."
+    # Always rebuild to ensure fresh binaries
+    echo "Building $VARIANT in $BUILD_DIR..."
+    pushd "$BUILD_DIR" > /dev/null
+    rm -f CMakeCache.txt build_passed.flag
+    cmake .. $CMAKE_FLAGS > build.log 2>&1
+    if make -j$(nproc) >> build.log 2>&1; then
+        touch build_passed.flag
     else
-        echo "Building $VARIANT in $BUILD_DIR..."
-        pushd "$BUILD_DIR" > /dev/null
-        rm -f CMakeCache.txt
-        cmake .. $CMAKE_FLAGS > build.log 2>&1
-        if make -j$(nproc) >> build.log 2>&1; then
-            touch build_passed.flag
-        else
-            echo "BUILD FAILED for $VARIANT. Check build.log"
-            cat build.log
-            popd > /dev/null
-            continue
-        fi
+        echo "BUILD FAILED for $VARIANT. Check build.log"
+        cat build.log
         popd > /dev/null
+        continue
     fi
+    popd > /dev/null
     
     # Resource Dump & Gate (Only for opt variants)
     if [ "$VARIANT" != "baseline" ]; then
@@ -104,7 +101,7 @@ for VARIANT in "${VAR_LIST[@]}"; do
         
         for i in $(seq 0 $((REPS-1))); do
             OUT_DIR="$RUN_ROOT/${VARIANT}/ctx_${CTX}_run${i}"
-            if [ -f "$OUT_DIR/perf.json" ] && [ "${FORCE:-0}" != "1" ]; then
+            if [ -f "$OUT_DIR/perf.json" ] && grep -q '"exit_status": "OK"' "$OUT_DIR/perf.json" && [ "${FORCE:-0}" != "1" ]; then
                 echo "  Run $i already exists, skipping..."
                 continue
             fi
@@ -228,6 +225,10 @@ for var in ["v3", "v4"]:
 for var, contexts in results.items():
     summary["variants"][var] = {}
     for ctx, runs in contexts.items():
+        # Sort and discard warmup
+        runs.sort(key=lambda x: x.get('repetition', 0))
+        if len(runs) > 1: runs = runs[1:]
+        
         prefills = []
         peak_vrams = []
         for r in runs:
