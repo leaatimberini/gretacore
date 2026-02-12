@@ -160,6 +160,12 @@ void launch_kv_update(hipStream_t stream, float *cache_k, float *cache_v,
 #define FLASH_BLOCK_SIZE 32
 #define FLASH_HEAD_DIM 128
 
+#ifdef GRETA_PREFILL_Q_LDS_V4
+  #define PREFILL_SEG 32
+#else
+  #define PREFILL_SEG 16
+#endif
+
 __device__ __forceinline__ float round_fp16_device(float x) {
   return __half2float(__float2half_rn(x));
 }
@@ -542,14 +548,8 @@ void launch_attn_vacc_vsample(hipStream_t stream, const float *V_cache,
 
 #if defined(GRETA_PREFILL_Q_LDS) || defined(GRETA_PREFILL_Q_LDS_V4)
 
-#define FLASH_BLOCK_SIZE 32
-#define FLASH_HEAD_DIM 128
-
-#ifdef GRETA_PREFILL_Q_LDS_V4
-  #define PREFILL_SEG 32
-#else
-  #define PREFILL_SEG 16
-#endif
+// FLASH_BLOCK_SIZE is already defined globally at line 160
+// But we need PREFILL_SEG for the kernel and launch function
 
 __global__ void flash_attention_prefill_kernel(
     const float *__restrict__ Q,      // [seq_len, num_heads, head_dim]
@@ -559,10 +559,16 @@ __global__ void flash_attention_prefill_kernel(
     uint32_t seq_len, uint32_t num_heads, uint32_t num_heads_kv,
     uint32_t head_dim, float scale, bool causal) {
 
-  // LDS Reservation (32x128x4x2 + 32x32x4 = ~36KB)
-  __shared__ float sQ[32][128];
-  __shared__ float sK[32][128];
-  __shared__ float sV[32][PREFILL_SEG];
+  // Dynamic Shared Memory: passed as 3rd kernel arg
+  extern __shared__ float smem[];
+  float *sQ_ptr = smem;
+  float *sK_ptr = sQ_ptr + (32 * 128); // +16KB
+  float *sV_ptr = sK_ptr + (32 * 128); // +16KB
+  
+  // Helper accessors simulating 2D arrays
+  #define SQ(r, c) sQ_ptr[(r) * 128 + (c)]
+  #define SK(r, c) sK_ptr[(r) * 128 + (c)]
+  #define SV(r, c) sV_ptr[(r) * PREFILL_SEG + (c)]
 
   uint32_t head = blockIdx.x;
   uint32_t q_block = blockIdx.y;
@@ -579,18 +585,15 @@ __global__ void flash_attention_prefill_kernel(
   bool valid_q = (q_idx < seq_len);
   
   // 1. Vectorized Load Q into LDS (Full 128 dim)
-  // Each thread loads 4 floats * 4 iterations = 16 floats. 32 threads * 16 = 512 elements per block.
-  // Wait, 32 threads * 128 elements = 4096 elements.
-  // Each thread loads 128 elements (32 float4 loads).
   {
-      float4 *sQ4 = (float4*)sQ[tid];
+      float4 *sQ4 = (float4*)sQ_ptr;
       const float4 *Q4 = (const float4*)&Q[q_idx * num_heads * 128 + head * 128];
       if (valid_q) {
           #pragma unroll
-          for (int i = 0; i < 32; ++i) sQ4[i] = Q4[i];
+          for (int i = 0; i < 32; ++i) sQ4[tid * 32 + i] = Q4[i]; // Correct offset: row tid
       } else {
           #pragma unroll
-          for (int i = 0; i < 32; ++i) sQ4[i] = make_float4(0,0,0,0);
+          for (int i = 0; i < 32; ++i) sQ4[tid * 32 + i] = make_float4(0,0,0,0);
       }
   }
   __syncthreads();
@@ -605,37 +608,23 @@ __global__ void flash_attention_prefill_kernel(
       float m = -INFINITY;
       float l = 0.0f;
       
-      // Critical Fix: k_limit must be UNIFORM for the block to avoid deadlock at __syncthreads()
-      // We loop until the end of the sequence or the end of the current Q block
       uint32_t block_k_limit = seq_len;
-      if (causal) {
-           // For causal, we need to cover up to the max q_idx in this block
-           block_k_limit = min(seq_len, q_start + 32);
-      }
+      if (causal) block_k_limit = min(seq_len, q_start + 32);
       
       for (uint32_t k_block = 0; k_block < block_k_limit; k_block += 32) {
-          // A. Minimalistic Cooperative Load K Block
-          // We have 32 threads. Each thread loads 4 floats (128/32 = 4)
-          for (uint32_t col_pass = 0; col_pass < 4; ++col_pass) {
-              uint32_t col = col_pass * 32 + tid;
-              uint32_t abs_k = k_block + tid; // This is a bit diagonal but safe
-              // Actually, let's do: thread tid loads row i, column tid... no.
-              // Simplest: tid loads column tid for all rows (sequential)
-          }
-
-          // Let's use the most standard approach:
+          // A. Load K (Sequential-Parallel)
           for (uint32_t r = 0; r < 32; ++r) {
               uint32_t abs_k = k_block + r;
               // Parallelize over column
               for (uint32_t c = tid; c < 128; c += 32) {
-                  if (abs_k < seq_len) sK[r][c] = K[abs_k * num_heads_kv * 128 + kv_head * 128 + c];
-                  else sK[r][c] = 0.0f;
+                  if (abs_k < seq_len) SK(r, c) = K[abs_k * num_heads_kv * 128 + kv_head * 128 + c];
+                  else SK(r, c) = 0.0f;
               }
               // Parallelize over V column
               for (uint32_t c_v = tid; c_v < PREFILL_SEG; c_v += 32) {
                   uint32_t abs_d = d_start + c_v;
-                  if (abs_k < seq_len && abs_d < head_dim) sV[r][c_v] = V[abs_k * num_heads_kv * 128 + kv_head * 128 + abs_d];
-                  else sV[r][c_v] = 0.0f;
+                  if (abs_k < seq_len && abs_d < head_dim) SV(r, c_v) = V[abs_k * num_heads_kv * 128 + kv_head * 128 + abs_d];
+                  else SV(r, c_v) = 0.0f;
               }
           }
           __syncthreads();
@@ -645,12 +634,11 @@ __global__ void flash_attention_prefill_kernel(
               uint32_t block_end = min(32u, block_k_limit - k_block);
               for (uint32_t k = 0; k < block_end; ++k) {
                   uint32_t abs_k = k_block + k;
-                  // Causal check: if abs_k > q_idx, mask it (skip accumulation)
                   if (causal && abs_k > q_idx) continue;
                   
                   float dot = 0.0f;
                   #pragma unroll 16
-                  for (int c = 0; c < 128; ++c) dot += sQ[tid][c] * sK[k][c];
+                  for (int c = 0; c < 128; ++c) dot += SQ(tid, c) * SK(k, c);
                   
                   float s = dot * scale;
                   float m_old = m;
@@ -658,9 +646,11 @@ __global__ void flash_attention_prefill_kernel(
                   float p = expf(s - m);
                   float scale_old = expf(m_old - m);
                   l = l * scale_old + p;
-                  for (int i = 0; i < PREFILL_SEG; ++i) acc[i] = acc[i] * scale_old + p * sV[k][i];
+                  for (int i = 0; i < PREFILL_SEG; ++i) acc[i] = acc[i] * scale_old + p * SV(k, i);
               }
           }
+          
+          // CRITICAL BARRIER: Prevent overwriting LDS before peers finish
           __syncthreads();
       }
 
@@ -843,7 +833,16 @@ void launch_flash_attention_prefill(hipStream_t stream,
                                     float scale, bool causal) {
   dim3 grid(num_heads, (seq_len + FLASH_BLOCK_SIZE - 1) / FLASH_BLOCK_SIZE);
   dim3 block(FLASH_BLOCK_SIZE);
-  flash_attention_prefill_kernel<<<grid, block, 0, stream>>>(
+  size_t shmem_size = 0;
+#if defined(GRETA_PREFILL_Q_LDS) || defined(GRETA_PREFILL_Q_LDS_V4)
+  // sQ[32][128] + sK[32][128] + sV[32][32]
+  // 4096 + 4096 + 1024 floats = 9216 floats * 4 bytes = 36864 bytes
+  // If SEG is 16 (V3), then sV is 32*16 = 512 floats -> Total 2048 bytes less.
+  // Let's use PREFILL_SEG macro which is available
+  shmem_size = (32 * 128 + 32 * 128 + 32 * PREFILL_SEG) * sizeof(float);
+#endif
+
+  flash_attention_prefill_kernel<<<grid, block, shmem_size, stream>>>(
       Q, K, V, O, seq_len, num_heads, num_heads_kv, head_dim, scale, causal);
 }
 
