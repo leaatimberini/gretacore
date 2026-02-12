@@ -37,6 +37,17 @@ get_reps() {
 }
 
 # Build and Run for each variant
+# Force 32k context in model config
+echo "Patching model_config.hpp for 32k context..."
+CONFIG_H="src/inference/include/gcore/inference/model_config.hpp"
+if [ -f "$CONFIG_H" ]; then
+    sed -i 's/max_seq_len = [0-9]\+/max_seq_len = 32768/g' "$CONFIG_H"
+    echo "Config Max Seq Len:"
+    grep "max_seq_len =" "$CONFIG_H"
+else
+    echo "WARNING: $CONFIG_H not found!"
+fi
+
 IFS=',' read -ra VAR_LIST <<< "$VARIANTS"
 for VARIANT in "${VAR_LIST[@]}"; do
     echo "=== Processing Variant: $VARIANT ==="
