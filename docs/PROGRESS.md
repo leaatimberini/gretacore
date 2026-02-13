@@ -51,10 +51,12 @@
 **B3.82**: COMPLETED - Steady-State Decode Scaling (8k) (PASS; 100% tokens)
 **B3.83**: COMPLETED - Long-Context Decode (32k) (TIMEOUT)
 **B3.84**: COMPLETED - High-Pressure Batch Decode (16k) (PASS; 110GB VRAM)
+**B3.89**: COMPLETED - Prefill Kernel Optimization V3/V4 (COMPLETED; core 3/3 PASS; prefill_s: 22.77s@4096, 114.27s@8192, 469.75s@16384)
+**B3.90**: PENDING - Long Context Extension (16k-32k)
 
 ---
 
-## Sync Status (2026-02-09)
+## Sync Status (2026-02-13)
 
 **Repo branch**: `main` (tracked via origin/main)
 
@@ -65,16 +67,14 @@
 - B3.67 guardrail closeout (MI300X): `68b32be` (runner fix: `83770d8`; runner dump-logits: `d47c8f3`)
 - B3.68 greta_infer kv_aligned + logits dump: `4a57383`
 - B3.69 logits-diff gate: `e7418b2` (zlib linkage fix: `ee65f79`; docs: `e1f36ba`)
-- [x] **B3.85 — Prefill Complexity & Kernel Attribution** (MI300X)
-    - [x] Engine: Add phase timings (tokenize, prefill, decode)
-    - [x] Runner: Implement escalation (4k-32k)
-    - [x] Analyzer: Aggregate timings, fit scaling law
-    - [!] Status: INFRASTRUCTURE_READY; Awaiting remote execution stability
-- B3.89 V3 (Q-LDS): `23714b7` (Infra: `ec6fe74`; Docs: `db69892`)
-- [ ] B3.89: Prefill Kernel Optimization V3/V4 - **IN_PROGRESS** (Gate Passed, 4k Success)
-    - [x] V3: Zero scratch spill achieved (MI300X)
-    - [x] V3: 4k prefill speedup 1.21x
-    - [ ] V4: SEG=32 exploration (Reduce reloads)
+- [x] B3.89 V3 (Q-LDS): `23714b7` (Infra: `ec6fe74`; Docs: `db69892`)
+    - [x] B3.89: Prefill Kernel Optimization V3/V4 - **COMPLETED**
+        - [x] GGUF context_length patch (2048 → 32768)
+        - [x] Executor GRETA_MAX_SEQ_LEN fix ($((CTX+2)))
+        - [x] Core tests: 3/3 PASS
+        - [x] V3: Zero scratch spill achieved (MI300X)
+        - [x] V3: 4k prefill speedup 1.21x
+- B3.90: Long Context Extension (16k-32k)
 - B3.74 internal audit: `f31ab1c`
 - Docs index: `1f662f1`
 

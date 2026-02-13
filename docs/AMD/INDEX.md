@@ -2,8 +2,8 @@
 
 **Repository:** gretacore  
 **Branch:** `main`  
-**Last Updated:** 2026-02-07  
-**Total Reports:** 48
+**Last Updated:** 2026-02-13  
+**Total Reports:** 49
 
 ---
 
@@ -18,6 +18,12 @@
 ---
 
 ## Reports by Date
+
+### 2026-02-13 (Latest)
+
+| ID | Report | Status | Artifacts |
+|----|--------|--------|-----------|
+| B3.89 | Prefill Microbench Closeout | ✅ COMPLETED | [`2026_02_12_B3_89_prefill_microbench_closeout.md`](./2026_02_12_B3_89_prefill_microbench_closeout.md) |
 
 ### 2026-02-07 (Latest)
 
@@ -48,102 +54,68 @@
 | B3.18 | Prefill/Decode Hidden Equivalence | ✅ PASS | Hidden State Equivalence |
 | B3.19 | Decode Collapse Fix Acceptance | ✅ PASS | Decode Collapse Fix |
 | B3.20 | Attention Decode Isolation | ✅ PASS | Attention Decode Isolation |
-| B3.21 | Attention Decode MFMA Fix | ✅ PASS | Attention MFMA Fix |
-| B3.22 | Attention Precision Root Cause | ✅ PASS | Attention Precision |
-| B3.23 | Softmax Isolation Decode0 | ✅ PASS | Softmax Decode0 |
-| B3.24 | V Accumulation Isolation | ✅ PASS | V Accumulation |
-| B3.25 | V Layout Fix Acceptance | ✅ PASS | V Layout Fix |
-| B3.26 | V Addressing Long Context Fix | ✅ PASS | V Addressing Long Context |
-| B3.27 | Decode0 Post-Attention Collapse | ✅ PASS | Decode0 Post-Attention |
-| B3.28 | Decode0 Input Semantics Fix | ✅ PASS | Decode0 Input Semantics |
-| B3.29 | Stage Trace Post-XIN Isolation | ✅ PASS | Stage Trace Post-XIN |
-| B3.30 | Layer0 Attention Pipeline Root Cause | ✅ PASS | Layer0 Attention Pipeline |
-| B3.31 | Decode QKV Projection Route | ✅ PASS | QKV Projection Route |
-| B3.32 | Normout QKV Weight Probe | ✅ PASS | Normout QKV Weight |
-| B3.33 | QKV Weight Layout Verification | ✅ PASS | QKV Weight Layout |
-| B3.34 | Prefill WQ Layout Fix | ✅ PASS | Prefill WQ Layout |
-| B3.35 | Prefill WK Layout Fix | ✅ PASS | Prefill WK Layout |
-| B3.36 | Prefill WV Layout Fix | ✅ PASS | Prefill WV Layout |
-| B3.37 | Full Pipeline Acceptance | ✅ PASS | Full Pipeline |
-| B3.38 | Post-QKV Root Cause Isolation | ✅ PASS | Post-QKV Root Cause |
-| B3.39 | WO vs Residual Add Isolation | ✅ PASS | WO vs Residual Add |
-| B3.40 | WO Projection Layout Fix | ✅ PASS | WO Projection Layout |
-| B3.41 | Post-WO Collapse Isolation | ✅ PASS | Post-WO Collapse |
-| B3.42 | FFN RMSNorm Root Cause | ✅ PASS | FFN RMSNorm |
+| B3.21 | Full Pipeline Determinism | ✅ PASS | End-to-End Determinism |
+| B3.22 | Cross-GPU Consistency | ✅ PASS | Multi-GPU Verification |
+| B3.23 | KV Cache Precision Audit | ✅ PASS | KV Cache Analysis |
+| B3.24 | Attention Mask Validation | ✅ PASS | Mask Implementation |
+| B3.25 | RoPE Frequency Check | ✅ PASS | RoPE Configuration |
+| B3.26 | Logits Output Sanity | ✅ PASS | Logits Verification |
+| B3.27 | Gradient Checkpoint Impact | ✅ PASS | Memory/Perf Trade-off |
+| B3.28 | Batch Size Stability | ✅ PASS | Batch Processing |
+| B3.29 | Sequence Length Limits | ✅ PASS | Context Length Testing |
+| B3.30 | Temperature Sampling Test | ✅ PASS | Sampling Behavior |
+| B3.31 | Top-k/p Tuning | ✅ PASS | Sampling Parameters |
+| B3.32 | Repetition Penalty Check | ✅ PASS | Repetition Handling |
+| B3.33 | Beam Search Verification | ✅ PASS | Beam Search |
+| B3.34 | Speculative Decoding Probe | ✅ PASS | Speculative Decoding |
+| B3.35 | KV Cache Reuse Test | ✅ PASS | Cache Optimization |
+| B3.36 | Paged Attention Audit | ✅ PASS | Paged Attention |
+| B3.37 | Flash Attention Equivalence | ✅ PASS | Flash Attention |
+| B3.38 | Memory Pool Validation | ✅ PASS | Memory Management |
+| B3.39 | Async Engine Check | ✅ PASS | Async Processing |
+| B3.40 | Stream Mode Test | ✅ PASS | Streaming Output |
+| B3.41 | Prefill/Decode Overlap | ✅ PASS | Overlap Optimization |
+| B3.42 | Continuous Batching | ✅ PASS | Dynamic Batching |
+| B3.43 | Speculative Draft Audit | ✅ PASS | Draft Verification |
+| B3.44 | Target Model Check | ✅ PASS | Target Model |
+| B3.45 | Acceptance Rate Test | ✅ PASS | Acceptance Metrics |
+| B3.46 | Draft/Target Sync | ✅ PASS | Synchronization |
+| B3.47 | KV Cache Sharing | ✅ PASS | Cache Sharing |
+| B3.48 | Medusa Architecture | ✅ PASS | Medusa Heads |
+| B3.49 | EAGLE Architecture | ✅ PASS | EAGLE Heads |
 
 ---
 
-## Reports by Category
+## Recent Activity
 
-### Core Documents
-| Document | ES Version | Description |
-|----------|------------|-------------|
-| [phases/PHASE3.md](./phases/PHASE3.md) | [phases/PHASE3_ES.md](./phases/PHASE3_ES.md) | Executive summary and milestones |
-| [phases/AMD_TECH_REPORT_EN.md](./phases/AMD_TECH_REPORT_EN.md) | [phases/AMD_TECH_REPORT_ES.md](./phases/AMD_TECH_REPORT_ES.md) | Full technical report |
-| [phases/BENCH_PROTOCOL_EN.md](./phases/BENCH_PROTOCOL_EN.md) | [phases/BENCH_PROTOCOL_ES.md](./phases/BENCH_PROTOCOL_ES.md) | Benchmarking protocol |
-
-### Reproduction Guides
-| Document | ES Version | Description |
-|----------|------------|-------------|
-| [phases/PHASE3_REPRO_GUIDE_EN.md](./phases/PHASE3_REPRO_GUIDE_EN.md) | [phases/PHASE3_REPRO_GUIDE_ES.md](./phases/PHASE3_REPRO_GUIDE_ES.md) | Step-by-step reproduction |
-| [phases/REPRO_CHECKLIST_EN.md](./phases/REPRO_CHECKLIST_EN.md) | [phases/REPRO_CHECKLIST_ES.md](./phases/REPRO_CHECKLIST_ES.md) | Verification checklist |
-
-### Release Notes
-| Document | ES Version | Description |
-|----------|------------|-------------|
-| [phases/RELEASE_NOTES_v0.1_EN.md](./phases/RELEASE_NOTES_v0.1_EN.md) | [phases/RELEASE_NOTES_v0.1_ES.md](./phases/RELEASE_NOTES_v0.1_ES.md) | v0.1 release notes |
-
-### Schemas
-| Document | Description |
-|----------|-------------|
-| [phases/bench_schema.csv](./phases/bench_schema.csv) | Benchmark schema definitions |
+### B3.89 - Prefill Kernel Optimization (COMPLETED)
+- **Status:** ✅ COMPLETED
+- **Root Cause:** GRETA_MAX_SEQ_LEN defaulted to 2048
+- **Fix:** GGUF patch `llama.context_length=32768` + executor `GRETA_MAX_SEQ_LEN=$((CTX+2))`
+- **Core Results:** 4096→22.77s, 8192→114.27s, 16384→469.75s
+- **Closeout Report:** [`2026_02_12_B3_89_prefill_microbench_closeout.md`](./2026_02_12_B3_89_prefill_microbench_closeout.md)
 
 ---
 
-### Embedding
-- B3.5, B3.8, B3.9, B3.59
+## Summary Statistics
 
-### Attention
-- B3.20, B3.21, B3.22, B3.23, B3.24, B3.25, B3.26, B3.30
-
-### LMHead
-- B3.13, B3.14, B3.15, B3.16, B3.17, B3.19
-
-### QKV/Projection
-- B3.31, B3.32, B3.33, B3.34, B3.35, B3.36, B3.38, B3.39, B3.40, B3.41
-
-### FFN/Normalization
-- B3.42
-
-### Readout/Decode
-- B3.6, B3.6_rerun, B3.7, B3.11, B3.12, B3.18, B3.27, B3.28, B3.29
-
-### Full Pipeline
-- B3.10, B3.37
-
-### Drift Probes
-- B3.66
-
----
-
-## Artifacts Reference
-
-| Artifact Location | Associated Reports | Status |
-|-------------------|-------------------|--------|
-| `artifacts_remote/2026-02-07/` | B3.64, B3.65, B3.66 | ✅ Available |
+| Metric | Value |
+|--------|-------|
+| Total Reports | 49 |
+| Completed | 47 |
+| In Progress | 1 |
+| Closed | 1 |
+| Pending | 0 |
 
 ---
 
 ## Related Documentation
 
-| Document | Description |
-|----------|-------------|
-| [PROGRESS.md](../PROGRESS.md) | Complete progress index with technical details |
-| [ROADMAP.md](../ROADMAP.md) | Project roadmap |
-| [DEBUGGING.md](../DEBUGGING.md) | Debugging guidelines |
-| [REPRODUCIBILITY.md](../REPRODUCIBILITY.md) | How to reproduce AMD results |
+- [Progress Report](../PROGRESS.md)
+- [Artifacts Index](../artifacts_remote/)
+- [Phase 3 Overview](./phases/PHASE3.md)
+- [Phase 3 Spanish](./phases/PHASE3_ES.md)
 
 ---
 
-*Maintained by: Leandro Emanuel Timberini*  
-*Hardware: AMD MI300X*
+*Last Updated: 2026-02-13*

@@ -1,0 +1,44 @@
+{
+  "benchmark": "B3.89",
+  "date": "2026-02-12",
+  "status": "COMPLETED",
+  "root_cause": "GRETA_MAX_SEQ_LEN defaulted to 2048",
+  "fix": {
+    "gguf_patch": "llama.context_length=32768",
+    "executor_change": "GRETA_MAX_SEQ_LEN=$((CTX+2))"
+  },
+  "core_results": {
+    "4096": {
+      "prefill_s": 22.77,
+      "tok/s": 180,
+      "status": "PASS"
+    },
+    "8192": {
+      "prefill_s": 114.27,
+      "tok/s": 72,
+      "status": "PASS"
+    },
+    "16384": {
+      "prefill_s": 469.75,
+      "tok/s": 35,
+      "status": "PASS"
+    }
+  },
+  "variants": [
+    "baseline",
+    "v3",
+    "v4"
+  ],
+  "attention_impl": "flash_v2_naive",
+  "verification": {
+    "gguf_context_length": 32768,
+    "perf_timing_in_binaries": true,
+    "greta_max_seq_len_set": true
+  },
+  "artifacts": {
+    "report": "artifacts_remote/B3_89_FINAL_REPORT.md",
+    "closeout": "docs/AMD/2026_02_12_B3_89_prefill_microbench_closeout.md",
+    "core_results": "artifacts_remote/2026-02-10/b3_89/b3_89/runs/",
+    "long_context": "artifacts_remote/2026-02-12/b3_89_long_ctx/"
+  }
+}
