@@ -107,3 +107,8 @@ tmp/
 # 6. EXCEPCIONES
 # -----------------------------------------------------------------------------
 *_workspace_rules.md
+
+# Local artifacts / scratch
+artifacts_remote/
+tmp/
+
