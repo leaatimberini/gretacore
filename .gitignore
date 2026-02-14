@@ -1,47 +1,23 @@
 # =============================================================================
-# GRETA CORE .gitignore - HARDENED
+# GRETA CORE .gitignore - MINIMAL HARDENED
 # =============================================================================
 
-# -----------------------------------------------------------------------------
-# 1. ENTORNOS Y HERRAMIENTAS DE DESARROLLO
-# -----------------------------------------------------------------------------
+# Development & Environment
 .venv/
-.venv/**
 venv/
-*.pyc
 __pycache__/
 *.py[cod]
 *$py.class
 .pytest_cache/
 .coverage
-coverage.xml
 htmlcov/
-
-# IDEs
 .vscode/
 .idea/
 *.swp
-*.swo
 *~
 .DS_Store
-Thumbs.db
 
-# Agentes IA
-.agents/
-.kilocode/
-.skills/
-AGENTS.md
-implementation_plan.md
-docs/WORKSPACE_RULES.md
-
-# Archivos internos
-*_MIGRATION_*.md
-*_AUDIT*.md
-LOCAL_*.txt
-
-# -----------------------------------------------------------------------------
-# 2. BUILD Y COMPILACIÓN
-# -----------------------------------------------------------------------------
+# Build & Compilation
 build/
 bin/
 obj/
@@ -51,35 +27,22 @@ obj/
 *.so.*
 *.d
 *.dylib
-*.lib
 CMakeCache.txt
 CMakeFiles/
-cmake_install.cmake
 Makefile
 *.cmake
 *.ninja
 
-# -----------------------------------------------------------------------------
-# 3. ARTEFACTOS Y OUTPUTS
-# -----------------------------------------------------------------------------
+# Large Artifacts & Scratch (Strict Ignore)
 artifacts/
-artifacts/**/
+artifacts_remote/
+tmp/
+*.tgz
+*.log
+*.out
+*.err
 
-# Remote Artifacts: Ignore all content but allow specific reports
-artifacts_remote/*
-!artifacts_remote/
-!artifacts_remote/**/b3_*_analysis.txt
-!artifacts_remote/**/report_*.md
-!artifacts_remote/**/summary.json
-!artifacts_remote/B3_89_FINAL_REPORT.md
-
-# Outputs
-alignment_results.json
-*.jsonl
-
-# -----------------------------------------------------------------------------
-# 4. MODELOS Y DATOS
-# -----------------------------------------------------------------------------
+# Models & Big Data
 models/
 *.gguf
 *.safetensors
@@ -87,23 +50,5 @@ models/
 *.pt
 *.ckpt
 
-# -----------------------------------------------------------------------------
-# 5. TEMP Y LOGS
-# -----------------------------------------------------------------------------
-*.tmp
-*.log
-*.out
-*.err
-*~
-*.bak
-*.backup
-tmp/
-
-# -----------------------------------------------------------------------------
-# 6. EXCEPCIONES Y OTROS
-# -----------------------------------------------------------------------------
-*_workspace_rules.md
-*.tgz
-
-# Inference builds
+# Specific Build Dirs
 tools/inference/build_*/

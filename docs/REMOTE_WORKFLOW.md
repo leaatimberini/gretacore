@@ -1,4 +1,3 @@
----
 # Remote Workflow (MI300X) — GRETA CORE
 
 This repository is operated **remote-first** on the MI300X node for reliability and reproducibility.
