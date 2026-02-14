@@ -166,11 +166,15 @@ collect_diag() {
 
 # ---------------------------------------------------------------------------
 # run_with_heartbeat — runs CMD in background, emits HEARTBEAT JSON every 60s
+#   Usage: run_with_heartbeat <timeout_s> <log_file> <cmd...>
+#   The command's stdout/stderr go to <log_file>.
+#   Heartbeats and progress go to the caller's stdout (the main log).
 # ---------------------------------------------------------------------------
 run_with_heartbeat() {
     local timeout_s=$1; shift
-    # Run command in background
-    "$@" &
+    local log_file=$1; shift
+    # Run command in background, redirect only its output to log_file
+    "$@" > "$log_file" 2>&1 &
     local bg_pid=$!
     local start_epoch
     start_epoch=$(epoch_s)
@@ -438,6 +442,17 @@ for VARIANT in "${VAR_LIST[@]}"; do
             if [ -f "$OUT_DIR/perf.json" ] && grep -q '"exit_status": "OK"' "$OUT_DIR/perf.json" && [ "${FORCE:-0}" != "1" ]; then
                 echo "  Run $i already exists, skipping..."
                 TEST_INDEX=$(( TEST_INDEX + 1 ))
+                emit_event "TEST_SKIP" \
+                    "variant=${VARIANT}" \
+                    "ctx=${CTX}" \
+                    "run_idx=${i}" \
+                    "test_index=${TEST_INDEX}" \
+                    "total_tests=${TOTAL_TESTS}" \
+                    "reason=perf.json exists (OK)"
+                
+                print_progress "$TEST_INDEX" "$TOTAL_TESTS" \
+                    "SKIP variant=${VARIANT} ctx=${CTX} run=${i} reason=perf.json exists (OK)"
+
                 _DONE_THIS_CTX=$(( _DONE_THIS_CTX + 1 ))
                 continue
             fi
@@ -474,13 +489,13 @@ for VARIANT in "${VAR_LIST[@]}"; do
             export _RWP_DONE_THIS_CTX="$_DONE_THIS_CTX"
             set +e
             START=$(date +%s.%N)
-            run_with_heartbeat "$CTX_TIMEOUT_S" \
+            run_with_heartbeat "$CTX_TIMEOUT_S" "$OUT_DIR/run.log" \
                 timeout -k 30s "${CTX_TIMEOUT_S}s" \
                 ./$BUILD_DIR/greta_infer \
                     --model ./models/greta-v1.gguf \
                     --prompt-file /tmp/prompt.txt \
                     --max-tokens 1 \
-                    --greedy > "$OUT_DIR/run.log" 2>&1
+                    --greedy
             EXIT_STATUS=$?
             set -e
             END=$(date +%s.%N)

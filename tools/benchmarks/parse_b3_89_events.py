@@ -63,6 +63,20 @@ def build_summary(events):
                 "decode_s": ev.get("decode_s", "NA"),
             })
             suite["completed"] = ev.get("test_index", suite["completed"])
+        elif etype == "TEST_SKIP":
+            tests.append({
+                "variant": ev.get("variant", "?"),
+                "ctx": ev.get("ctx", "?"),
+                "run_idx": ev.get("run_idx", "?"),
+                "status": "SKIP",
+                "exit_code": "-",
+                "prefill_s": "-",
+                "wall_s": "-",
+                "attn_impl": "-",
+                "model_load_s": "-",
+                "decode_s": "-",
+            })
+            suite["completed"] = ev.get("test_index", suite["completed"])
         elif etype == "HEARTBEAT":
             last_heartbeat = ev
         elif etype == "SUITE_END":
