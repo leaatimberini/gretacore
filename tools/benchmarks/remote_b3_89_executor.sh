@@ -3,6 +3,11 @@
 # B3.89 Single-Shot Remote Executor
 # Usage: ./remote_b3_89_executor.sh <DATE> <VARIANTS> <CONTEXTS> <REPEAT_MAP>
 # Example: ./remote_b3_89_executor.sh 2026-02-11 "v3" "4096,8192" "4096:2,8192:1"
+#
+# Environment:
+#   B3_89_MODE=perf|debug  (default: perf)
+#     perf  — no serialization env vars; fast runs for real measurements.
+#     debug — HIP_LAUNCH_BLOCKING=1, AMD_SERIALIZE_KERNEL=3, HSA_ENABLE_SDMA=0.
 # =============================================================================
 set -euo pipefail
 
@@ -71,6 +76,39 @@ run_with_progress() {
     return $?
 }
 
+# ---------------------------------------------------------------------------
+# Diagnostics helper — called on non-zero exit
+# ---------------------------------------------------------------------------
+collect_diag() {
+    local out_dir=$1 exit_code=$2 run_log=$3
+    local diag="$out_dir/diag.txt"
+    {
+        echo "=== DIAGNOSTICS (exit_code=${exit_code}) at $(ts) ==="
+        echo ""
+        echo "--- dmesg (OOM / killed) ---"
+        dmesg -T 2>/dev/null | tail -n 200 | grep -Ei "out of memory|oom|killed process|cgroup" || echo "(none found)"
+        echo ""
+        echo "--- free -h ---"
+        free -h 2>/dev/null || echo "(free not available)"
+        echo ""
+        echo "--- rocm-smi snapshot ---"
+        if command -v rocm-smi &>/dev/null; then
+            rocm-smi --showuse --showmeminfo vram --showpower --showclocks --showtemp 2>/dev/null \
+                | sed -n '1,200p' || echo "(rocm-smi failed)"
+        else
+            echo "(rocm-smi not available)"
+        fi
+        echo ""
+        echo "--- run.log last 80 lines ---"
+        if [ -f "$run_log" ]; then
+            tail -n 80 "$run_log"
+        else
+            echo "(run.log not found)"
+        fi
+    } > "$diag" 2>&1
+    echo "$(ts) DIAG written to $diag"
+}
+
 # Global suite progress counters
 TOTAL_TESTS=0
 TEST_INDEX=0
@@ -80,16 +118,66 @@ VARIANTS=$2  # Comma separated: v3,v4,baseline
 CONTEXTS=$3  # Comma separated: 4096,8192,...
 REPEAT_MAP=$4 # Format: "ctx:rep,ctx:rep" e.g. "4096:2,8192:1"
 
+# ---------------------------------------------------------------------------
+# MODE switch: perf (default) vs debug
+# ---------------------------------------------------------------------------
+B3_89_MODE="${B3_89_MODE:-perf}"
+if [[ "$B3_89_MODE" != "perf" && "$B3_89_MODE" != "debug" ]]; then
+    echo "ERROR: B3_89_MODE must be 'perf' or 'debug' (got '$B3_89_MODE')"
+    exit 1
+fi
+
 # Setup environment
 export RUN_ROOT="artifacts_remote/$DATE/b3_89"
 mkdir -p "$RUN_ROOT"
 cd /root/gretacore
 
-# Common env vars for determinism
+# Always set verbose info
 export GRETA_VERBOSE_INFO=1
-export HIP_LAUNCH_BLOCKING=1
-export AMD_SERIALIZE_KERNEL=3
-export HSA_ENABLE_SDMA=0
+
+if [ "$B3_89_MODE" = "debug" ]; then
+    # Debug/determinism env vars — forces kernel serialization (very slow)
+    export HIP_LAUNCH_BLOCKING=1
+    export AMD_SERIALIZE_KERNEL=3
+    export HSA_ENABLE_SDMA=0
+else
+    # Perf mode — unset any inherited serialization flags
+    unset HIP_LAUNCH_BLOCKING 2>/dev/null || true
+    unset AMD_SERIALIZE_KERNEL 2>/dev/null || true
+    unset HSA_ENABLE_SDMA 2>/dev/null || true
+fi
+
+# VRAM sampling interval: 1s for debug, 10s for perf (reduces overhead)
+VRAM_SAMPLE_INTERVAL=10
+if [ "$B3_89_MODE" = "debug" ]; then
+    VRAM_SAMPLE_INTERVAL=1
+fi
+
+# ---------------------------------------------------------------------------
+# Startup Banner
+# ---------------------------------------------------------------------------
+echo "================================================================="
+echo " B3.89 Remote Executor — $(ts)"
+echo "================================================================="
+echo " MODE            : $B3_89_MODE"
+echo " DATE            : $DATE"
+echo " VARIANTS        : $VARIANTS"
+echo " CONTEXTS        : $CONTEXTS"
+echo " REPEAT_MAP      : $REPEAT_MAP"
+echo " RUN_ROOT        : $RUN_ROOT"
+echo " GRETA_VERBOSE   : ${GRETA_VERBOSE_INFO:-0}"
+echo " HIP_LAUNCH_BLK  : ${HIP_LAUNCH_BLOCKING:-<unset>}"
+echo " AMD_SERIALIZE   : ${AMD_SERIALIZE_KERNEL:-<unset>}"
+echo " HSA_ENABLE_SDMA : ${HSA_ENABLE_SDMA:-<unset>}"
+echo " VRAM_SAMPLE_INT : ${VRAM_SAMPLE_INTERVAL}s"
+echo "-----------------------------------------------------------------"
+echo " Host RAM        : $(free -h 2>/dev/null | awk '/^Mem:/{print $2}' || echo 'NA')"
+if command -v rocm-smi &>/dev/null; then
+    echo " GPU VRAM        : $(rocm-smi --showmeminfo vram 2>/dev/null | grep -i 'total' | head -1 | awk '{print $NF}' || echo 'NA')"
+else
+    echo " GPU VRAM        : NA (rocm-smi not found)"
+fi
+echo "================================================================="
 
 # Helper to get repetition count
 get_reps() {
@@ -216,20 +304,20 @@ for VARIANT in "${VAR_LIST[@]}"; do
             
             echo "  Run $i (including VRAM sampling)..."
             
-            # Start VRAM sampling in background
+            # Start VRAM sampling in background (interval depends on mode)
             rocm-smi --showmeminfo vram --json > "$OUT_DIR/vram_before.json" 2>&1 || true
             (
                 while true; do
                     rocm-smi --showmeminfo vram --json >> "$OUT_DIR/vram_samples.jsonl" 2>&1
                     echo "" >> "$OUT_DIR/vram_samples.jsonl"
-                    sleep 1
+                    sleep "$VRAM_SAMPLE_INTERVAL"
                 done
             ) &
             SMI_PID=$!
             
             # Allow failure to capture log
             CTX_TIMEOUT_S="$(ctx_timeout_s "$CTX")"
-            echo "$(ts) START variant=${VARIANT} ctx=${CTX} run=${i} timeout_s=${CTX_TIMEOUT_S}"
+            echo "$(ts) START variant=${VARIANT} ctx=${CTX} run=${i} timeout_s=${CTX_TIMEOUT_S} mode=${B3_89_MODE}"
             # Export context for heartbeat helper
             export _RWP_VARIANT="$VARIANT" _RWP_CTX="$CTX" _RWP_RUN="$i"
             set +e
@@ -255,6 +343,8 @@ for VARIANT in "${VAR_LIST[@]}"; do
                 STATUS_STR="FAIL"
                 echo "CRITICAL: Run $i crashed (Exit $EXIT_STATUS)"
                 tail -n 30 "$OUT_DIR/run.log"
+                # --- Exit 137 / OOM diagnostics ---
+                collect_diag "$OUT_DIR" "$EXIT_STATUS" "$OUT_DIR/run.log"
             fi
             
             # Check for prompt tokens in log
@@ -267,6 +357,10 @@ for VARIANT in "${VAR_LIST[@]}"; do
             if [ -z "$TIMINGS" ] || [ "$TIMINGS" == "{}" ]; then
                  echo "CRITICAL: Missing performance timings in run log!"
                  STATUS_STR="FAIL"
+                 # Capture diagnostics if not already written (exit was 0 but PERF_TIMING missing)
+                 if [ ! -f "$OUT_DIR/diag.txt" ]; then
+                     collect_diag "$OUT_DIR" "$EXIT_STATUS" "$OUT_DIR/run.log"
+                 fi
             elif echo "$TIMINGS" | grep -q '"prefill_s":0'; then
                  echo "CRITICAL: Silent failure detected (prefill_s: 0)!"
                  echo "--- RUN LOG TAIL ---"
@@ -282,6 +376,7 @@ for VARIANT in "${VAR_LIST[@]}"; do
   "repetition": $i,
   "wall_time_sec": $WALL,
   "exit_status": "$STATUS_STR",
+  "mode": "$B3_89_MODE",
   "timings": $TIMINGS
 }
 EOT
