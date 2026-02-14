@@ -1,11 +1,10 @@
-# =============================================================================
-# GRETA CORE .gitignore - MINIMAL HARDENED
-# =============================================================================
-
-# Development & Environment
+=============================================================================
+GRETA CORE .gitignore - MINIMAL HARDENED
+=============================================================================
+Development & Environment
 .venv/
 venv/
-__pycache__/
+pycache/
 *.py[cod]
 *$py.class
 .pytest_cache/
@@ -17,14 +16,14 @@ htmlcov/
 *~
 .DS_Store
 
-# Build & Compilation
+Build & Compilation
 build/
 bin/
 obj/
 *.o
 *.a
 *.so
-*.so.*
+.so.
 *.d
 *.dylib
 CMakeCache.txt
@@ -33,7 +32,7 @@ Makefile
 *.cmake
 *.ninja
 
-# Large Artifacts & Scratch (Strict Ignore)
+Large Artifacts & Scratch
 artifacts/
 artifacts_remote/
 tmp/
@@ -42,7 +41,7 @@ tmp/
 *.out
 *.err
 
-# Models & Big Data
+Models & Big Data
 models/
 *.gguf
 *.safetensors
@@ -50,5 +49,5 @@ models/
 *.pt
 *.ckpt
 
-# Specific Build Dirs
+Specific Build Dirs
 tools/inference/build_*/
