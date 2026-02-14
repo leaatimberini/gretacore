@@ -38,7 +38,7 @@
   "artifacts": {
     "report": "artifacts_remote/B3_89_FINAL_REPORT.md",
     "closeout": "docs/AMD/2026_02_12_B3_89_prefill_microbench_closeout.md",
-    "core_results": "artifacts_remote/2026-02-10/b3_89/b3_89/runs/",
+    "core_results": "artifacts_remote/2026-02-12/b3_89/",
     "long_context": "artifacts_remote/2026-02-12/b3_89_long_ctx/"
   }
 }

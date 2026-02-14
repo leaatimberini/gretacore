@@ -145,7 +145,7 @@ grep GRETA_MAX_SEQ_LEN /root/gretacore/tools/benchmarks/remote_b3_89_executor.sh
 ### 3.4 Run Core Tests
 ```bash
 ssh root@129.212.184.200 "
-cd /root/gretacore/artifacts_remote/2026-02-10/b3_89
+cd /root/gretacore/artifacts_remote/2026-02-12/b3_89
 for ctx in 4096 8192 16384; do
     timeout 600s ./greta_infer --prompt \"\$(python3 -c 'print(\"a\"*'$ctx')')\" --max-tokens 1 2>&1 | grep -E '(prefill_s|EXIT_CODE)'
 done
@@ -237,9 +237,9 @@ GRETA_MAX_SEQ_LEN=$((CTX+2))
 |----------|----------|-------------|
 | Final Report | `artifacts_remote/B3_89_FINAL_REPORT.md` | Full benchmark report |
 | Closeout | `docs/AMD/2026_02_12_B3_89_prefill_microbench_closeout.md` | This file |
-| Core Results | `artifacts_remote/2026-02-10/b3_89/` | Core test results |
+| Core Results | `artifacts_remote/2026-02-12/b3_89/` | Core test results |
 | Long Context | `artifacts_remote/2026-02-12/b3_89_long_ctx/` | Extended context tests |
-| Summary JSON | `artifacts_remote/2026-02-10/b3_89/summary.json` | Machine-readable summary |
+| Summary JSON | `artifacts_remote/2026-02-12/b3_89/summary.json` | Machine-readable summary |
 | Executor | `tools/benchmarks/remote_b3_89_executor.sh` | Test executor script |
 
 ---
@@ -285,7 +285,7 @@ nohup ./monitor_and_run.sh > monitor.log 2>&1 &
 - **Remote Node:** 129.212.184.200
 - **Model:** greta-v1.gguf
 - **Attention:** flash_v2_naive
-- **Date:** 2026-02-10 (Core), 2026-02-12 (Long Context)
+- **Date:** 2026-02-12 (Core), 2026-02-12 (Long Context)
 
 ---
 

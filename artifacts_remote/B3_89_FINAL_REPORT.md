@@ -6,7 +6,7 @@ B3.89 validates GRETA CORE V3/V4 Q-in-LDS kernels for MI300X. The benchmark suit
 **Status: ✅ PASSED** - Core tests completed successfully with flash_v2_naive attention implementation.
 
 ## Test Configuration
-- **Date**: 2026-02-10 (Core tests)
+- **Date**: 2026-02-12 (Core tests)
 - **Remote Node**: 129.212.184.200
 - **Variants Tested**: baseline (MQA), v3 (Q-in-LDS), v4 (Q-in-LDS v2)
 - **Context Lengths**: 4096, 8192, 16384 tokens

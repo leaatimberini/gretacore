@@ -25,7 +25,7 @@
 |----|--------|--------|-----------|
 | B3.89 | Prefill Microbench Closeout | ✅ COMPLETED | [`2026_02_12_B3_89_prefill_microbench_closeout.md`](./2026_02_12_B3_89_prefill_microbench_closeout.md) |
 
-### 2026-02-07 (Latest)
+### 2026-02-07
 
 | ID | Report | Status | Artifacts |
 |----|--------|--------|-----------|

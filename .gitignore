@@ -1,16 +1,12 @@
 # =============================================================================
 # GRETA CORE .gitignore - HARDENED
 # =============================================================================
-# Este archivo define qué archivos/carpetas NO deben ser versionados.
-# Para cambios, editar este archivo y commitear normalmente.
-# =============================================================================
 
 # -----------------------------------------------------------------------------
-# 1. ENTORNOS Y HERRAMIENTAS DE DESARROLLO (NUNCA versionar)
+# 1. ENTORNOS Y HERRAMIENTAS DE DESARROLLO
 # -----------------------------------------------------------------------------
 .venv/
 .venv/**
-venv/
 venv/
 *.pyc
 __pycache__/
@@ -21,7 +17,7 @@ __pycache__/
 coverage.xml
 htmlcov/
 
-# IDEs y editores
+# IDEs
 .vscode/
 .idea/
 *.swp
@@ -29,19 +25,16 @@ htmlcov/
 *~
 .DS_Store
 Thumbs.db
-*.sublime-*
-*.code-workspace
 
-# Agentes IA y tooling (PROHIBIDO versionar)
+# Agentes IA
 .agents/
 .kilocode/
 .skills/
-.skills/**/*
 AGENTS.md
 implementation_plan.md
 docs/WORKSPACE_RULES.md
 
-# Archivos internos de workflow (migración, auditoría)
+# Archivos internos
 *_MIGRATION_*.md
 *_AUDIT*.md
 LOCAL_*.txt
@@ -59,10 +52,6 @@ obj/
 *.d
 *.dylib
 *.lib
-*.exp
-*.pdb
-*.ilk
-*.map
 CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake
@@ -71,30 +60,29 @@ Makefile
 *.ninja
 
 # -----------------------------------------------------------------------------
-# 3. ARTEFACTOS Y OUTPUTS DE EJECUCIÓN (NUNCA versionar)
+# 3. ARTEFACTOS Y OUTPUTS
 # -----------------------------------------------------------------------------
 artifacts/
 artifacts/**/
 
-# Artifacts remotos - SOLO permitir análisis txt/md, bloquear binarios
-artifacts_remote/_rescued_from_remote/**
-artifacts_remote/**/run/**
-artifacts_remote/**/traces/**
-artifacts_remote/**/logs/**
-*.tgz
-*.tar.gz
-*.zip
+# Ignore remote artifacts by default
+artifacts_remote/*
 
-# Excepciones permitidas (reportes y análisis)
+# Allow traversing directories to find exceptions
+!artifacts_remote/
+
+# Exceptions: Reports and summaries
 !artifacts_remote/**/b3_*_analysis.txt
 !artifacts_remote/**/report_*.md
+!artifacts_remote/**/summary.json
+!artifacts_remote/B3_89_FINAL_REPORT.md
 
-# Outputs de alineación
+# Outputs
 alignment_results.json
 *.jsonl
 
 # -----------------------------------------------------------------------------
-# 4. MODELOS Y DATOS (grandes, externalizados)
+# 4. MODELOS Y DATOS
 # -----------------------------------------------------------------------------
 models/
 *.gguf
@@ -113,12 +101,9 @@ models/
 *~
 *.bak
 *.backup
+tmp/
 
 # -----------------------------------------------------------------------------
-# 6. EXCEPCIONES - SÍ versionar
+# 6. EXCEPCIONES
 # -----------------------------------------------------------------------------
-# (Forzar inclusión de archivos específicos si es necesario)
-# !tools/guard_no_sibling_checkouts.sh
-
-# Workspace rules (private)
 *_workspace_rules.md
