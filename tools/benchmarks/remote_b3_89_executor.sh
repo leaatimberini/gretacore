@@ -335,13 +335,44 @@ if [ ! -f "$CONFIG_H" ]; then
     exit 1
 fi
 
+# Detect original value
+ORIG_LINE=$(grep "max_seq_len =" "$CONFIG_H" | head -1)
+# Extract number from '    cfg.max_seq_len = 4096;'
+ORIG_VAL=$(echo "$ORIG_LINE" | sed -r 's/.*max_seq_len = ([0-9]+);.*/\1/')
+
+# Backup and Trap setup
+CONFIG_BACKUP=$(mktemp)
+cp "$CONFIG_H" "$CONFIG_BACKUP"
+ORIG_SHA=$(sha256sum "$CONFIG_H" | awk '{print $1}')
+
+restore_config() {
+    if [ -f "$CONFIG_BACKUP" ]; then
+        mv "$CONFIG_BACKUP" "$CONFIG_H"
+        RESTORED_SHA=$(sha256sum "$CONFIG_H" | awk '{print $1}')
+        
+        emit_event "CONFIG_RESTORE" \
+            "path=$CONFIG_H" \
+            "sha256_restored=$RESTORED_SHA"
+            
+        echo "Restored original model_config.hpp."
+    fi
+}
+trap restore_config EXIT
+
+# Apply Patch
 sed -i 's/max_seq_len = [0-9]\+/max_seq_len = 32768/g' "$CONFIG_H"
+NEW_SHA=$(sha256sum "$CONFIG_H" | awk '{print $1}')
 
 if grep -q "max_seq_len = 32768" "$CONFIG_H"; then
     echo "SUCCESS: model_config.hpp patched to 32768."
+    emit_event "CONFIG_PATCH" \
+        "path=$CONFIG_H" \
+        "from=${ORIG_VAL:-unknown}" \
+        "to=32768" \
+        "sha256_before=$ORIG_SHA" \
+        "sha256_after=$NEW_SHA"
 else
     echo "ERROR: Failed to patch model_config.hpp!"
-    grep "max_seq_len =" "$CONFIG_H"
     exit 1
 fi
 
