@@ -6,6 +6,75 @@
 # =============================================================================
 set -euo pipefail
 
+# ---------------------------------------------------------------------------
+# Progress / Heartbeat helpers  (added for B3.89 observability)
+# ---------------------------------------------------------------------------
+ts() { date -Is; }
+
+progress_bar() {
+    local cur=$1 total=$2 width=${3:-30}
+    local pct=0
+    if (( total > 0 )); then pct=$(( cur * 100 / total )); fi
+    local filled=$(( width * cur / (total > 0 ? total : 1) ))
+    local empty=$(( width - filled ))
+    printf '[%s%s] %d%% (%d/%d)' \
+        "$(printf '#%.0s' $(seq 1 $filled 2>/dev/null))" \
+        "$(printf '.%.0s' $(seq 1 $empty  2>/dev/null))" \
+        "$pct" "$cur" "$total"
+}
+
+ctx_timeout_s() {
+    case "$1" in
+        4096)  echo 10800  ;;  # 3 h
+        8192)  echo 21600  ;;  # 6 h
+        16384) echo 36000  ;;  # 10 h
+        24576) echo 50400  ;;  # 14 h
+        32768) echo 64800  ;;  # 18 h
+        *)     echo 21600  ;;  # default 6 h
+    esac
+}
+
+heartbeat() {
+    local variant=$1 ctx=$2 run_idx=$3 elapsed_s=$4
+    local gpu_use="NA" vram="NA"
+    if command -v rocm-smi &>/dev/null; then
+        gpu_use=$(rocm-smi --showuse 2>/dev/null | grep -oP '\d+%' | head -1 || echo "NA")
+        vram=$(rocm-smi --showmeminfo vram 2>/dev/null \
+               | grep -i 'used' | head -1 | awk '{print $NF}' || echo "NA")
+    fi
+    echo "$(ts) HEARTBEAT variant=${variant} ctx=${ctx} run=${run_idx} elapsed_s=${elapsed_s} gpu_use=${gpu_use} vram_used=${vram}"
+}
+
+run_with_progress() {
+    local timeout_s=$1; shift
+    # Run command in background
+    "$@" &
+    local bg_pid=$!
+    local start_epoch
+    start_epoch=$(date +%s)
+    while kill -0 "$bg_pid" 2>/dev/null; do
+        sleep 5
+        local now_epoch
+        now_epoch=$(date +%s)
+        local elapsed=$(( now_epoch - start_epoch ))
+        if (( elapsed % 60 < 6 )); then  # fires ~every 60s (within the 5s sleep window)
+            heartbeat "${_RWP_VARIANT:-?}" "${_RWP_CTX:-?}" "${_RWP_RUN:-?}" "$elapsed"
+            local est_pct=0
+            if (( timeout_s > 0 )); then
+                est_pct=$(( elapsed * 100 / timeout_s ))
+                if (( est_pct > 99 )); then est_pct=99; fi
+            fi
+            echo "$(ts) PROGRESS test_est=${est_pct}% elapsed=${elapsed}s budget=${timeout_s}s"
+        fi
+    done
+    wait "$bg_pid" 2>/dev/null
+    return $?
+}
+
+# Global suite progress counters
+TOTAL_TESTS=0
+TEST_INDEX=0
+
 DATE=$1
 VARIANTS=$2  # Comma separated: v3,v4,baseline
 CONTEXTS=$3  # Comma separated: 4096,8192,...
@@ -115,6 +184,16 @@ for VARIANT in "${VAR_LIST[@]}"; do
     
     # Execute Contexts
     IFS=',' read -ra CTX_LIST <<< "$CONTEXTS"
+
+    # --- Compute TOTAL_TESTS once (first variant) ---
+    if (( TOTAL_TESTS == 0 )); then
+        for _tc in "${CTX_LIST[@]}"; do
+            TOTAL_TESTS=$(( TOTAL_TESTS + $(get_reps "$_tc") ))
+        done
+        TOTAL_TESTS=$(( TOTAL_TESTS * ${#VAR_LIST[@]} ))
+        echo "$(ts) SUITE_START total_tests=${TOTAL_TESTS}"
+    fi
+
     for CTX in "${CTX_LIST[@]}"; do
         REPS=$(get_reps "$CTX")
         echo "Running $VARIANT at Context $CTX for $REPS repetitions..."
@@ -149,13 +228,19 @@ for VARIANT in "${VAR_LIST[@]}"; do
             SMI_PID=$!
             
             # Allow failure to capture log
+            CTX_TIMEOUT_S="$(ctx_timeout_s "$CTX")"
+            echo "$(ts) START variant=${VARIANT} ctx=${CTX} run=${i} timeout_s=${CTX_TIMEOUT_S}"
+            # Export context for heartbeat helper
+            export _RWP_VARIANT="$VARIANT" _RWP_CTX="$CTX" _RWP_RUN="$i"
             set +e
             START=$(date +%s.%N)
-            ./$BUILD_DIR/greta_infer \
-                --model ./models/greta-v1.gguf \
-                --prompt-file /tmp/prompt.txt \
-                --max-tokens 1 \
-                --greedy > "$OUT_DIR/run.log" 2>&1
+            run_with_progress "$CTX_TIMEOUT_S" \
+                timeout -k 30s "${CTX_TIMEOUT_S}s" \
+                ./$BUILD_DIR/greta_infer \
+                    --model ./models/greta-v1.gguf \
+                    --prompt-file /tmp/prompt.txt \
+                    --max-tokens 1 \
+                    --greedy > "$OUT_DIR/run.log" 2>&1
             EXIT_STATUS=$?
             set -e
             END=$(date +%s.%N)
@@ -200,6 +285,9 @@ for VARIANT in "${VAR_LIST[@]}"; do
   "timings": $TIMINGS
 }
 EOT
+            # --- Suite progress ---
+            TEST_INDEX=$(( TEST_INDEX + 1 ))
+            echo "$(ts) SUITE $(progress_bar $TEST_INDEX $TOTAL_TESTS) last_exit=${EXIT_STATUS} last_ctx=${CTX} last_variant=${VARIANT}"
         done
     done
 done
