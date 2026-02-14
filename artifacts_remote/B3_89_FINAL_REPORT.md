@@ -159,10 +159,8 @@ Context | Prefill Time | Scaling Factor
 ## Artifacts
 
 ### Core Tests
-- Results: `artifacts_remote/2026-02-10/b3_89/b3_89/runs/`
-  - `ctx_4096/perf.json`
-  - `ctx_8192/perf.json`
-  - `ctx_16384/perf.json`
+- Results: `artifacts_remote/2026-02-12/b3_89/`
+  - Core test metrics referenced in [`summary.json`](./2026-02-12/b3_89/summary.json)
 
 ### Long Context Tests (In Progress)
 - Location: `artifacts_remote/2026-02-12/b3_89_long_ctx/`

@@ -88,11 +88,13 @@
 
 ## Recent Activity
 
-### B3.89 - Prefill Kernel Optimization (COMPLETED)
+### B3.89 - Prefill Kernel Optimization V3/V4 (COMPLETED)
 - **Status:** ✅ COMPLETED
+- **Date:** 2026-02-12
 - **Root Cause:** GRETA_MAX_SEQ_LEN defaulted to 2048
 - **Fix:** GGUF patch `llama.context_length=32768` + executor `GRETA_MAX_SEQ_LEN=$((CTX+2))`
 - **Core Results:** 4096→22.77s, 8192→114.27s, 16384→469.75s
+- **Artifacts:** [`artifacts_remote/2026-02-12/b3_89/`](../../artifacts_remote/2026-02-12/b3_89/), [`artifacts_remote/B3_89_FINAL_REPORT.md`](../../artifacts_remote/B3_89_FINAL_REPORT.md)
 - **Closeout Report:** [`2026_02_12_B3_89_prefill_microbench_closeout.md`](./2026_02_12_B3_89_prefill_microbench_closeout.md)
 
 ---

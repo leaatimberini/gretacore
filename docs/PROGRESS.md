@@ -51,8 +51,7 @@
 **B3.82**: COMPLETED - Steady-State Decode Scaling (8k) (PASS; 100% tokens)
 **B3.83**: COMPLETED - Long-Context Decode (32k) (TIMEOUT)
 **B3.84**: COMPLETED - High-Pressure Batch Decode (16k) (PASS; 110GB VRAM)
-**B3.89**: COMPLETED - Prefill Kernel Optimization V3/V4 (COMPLETED; core 3/3 PASS; prefill_s: 22.77s@4096, 114.27s@8192, 469.75s@16384)
-**B3.90**: PENDING - Long Context Extension (16k-32k)
+**B3.89**: COMPLETED - Prefill Kernel Optimization V3/V4 (PASS; core 3/3; prefill_s: 22.77s@4096, 114.27s@8192, 469.75s@16384; artifacts: artifacts_remote/2026-02-12/b3_89/, artifacts_remote/B3_89_FINAL_REPORT.md)
 
 ---
 
@@ -67,14 +66,13 @@
 - B3.67 guardrail closeout (MI300X): `68b32be` (runner fix: `83770d8`; runner dump-logits: `d47c8f3`)
 - B3.68 greta_infer kv_aligned + logits dump: `4a57383`
 - B3.69 logits-diff gate: `e7418b2` (zlib linkage fix: `ee65f79`; docs: `e1f36ba`)
-- [x] B3.89 V3 (Q-LDS): `23714b7` (Infra: `ec6fe74`; Docs: `db69892`)
+- [x] B3.89 V3 (Q-LDS): Commit: 766e239 (branch: main)
     - [x] B3.89: Prefill Kernel Optimization V3/V4 - **COMPLETED**
         - [x] GGUF context_length patch (2048 → 32768)
         - [x] Executor GRETA_MAX_SEQ_LEN fix ($((CTX+2)))
         - [x] Core tests: 3/3 PASS
         - [x] V3: Zero scratch spill achieved (MI300X)
         - [x] V3: 4k prefill speedup 1.21x
-- B3.90: Long Context Extension (16k-32k)
 - B3.74 internal audit: `f31ab1c`
 - Docs index: `1f662f1`
 
@@ -114,7 +112,7 @@
 | B3.86 | 2026-02-10 | Attn Impl Probe | COMPLETED | PASS_PROBE | flash_v2_naive detected | artifacts_remote/2026-02-10/b3_86/ | docs/AMD/2026_02_10_B3_86_attention_impl_probe.md |
 | B3.87 | 2026-02-10 | Decode TPS Decomposition | COMPLETED | PASS_RCA | -11.1% TPS delta | artifacts_remote/2026-02-10/b3_87/ | docs/AMD/2026_02_10_B3_87_decode_tps_decomposition.md |
 | B3.88 | 2026-02-10 | 32k Feasibility | COMPLETED | PASS_32K_FEASIBLE | 32k prefill achieved | artifacts_remote/2026-02-10/b3_88/ | docs/AMD/2026_02_10_B3_88_32k_feasibility.md |
-| B3.89 | 2026-02-11 | Prefill Kernel Optimization | IN_PROGRESS | INFRA_HARDENED | Robustness fixes deployed (no silent fail) | artifacts_remote/2026-02-11/b3_89/ | docs/AMD/2026_02_10_B3_89_prefill_microbench_results.md |
+| B3.89 | 2026-02-12 | Prefill Kernel Optimization V3/V4 | COMPLETED | PASS | Root cause: GRETA_MAX_SEQ_LEN=2048; Fix: GGUF patch + executor update; Core: 3/3 PASS | artifacts_remote/2026-02-12/b3_89/, artifacts_remote/B3_89_FINAL_REPORT.md | docs/AMD/2026_02_12_B3_89_prefill_microbench_closeout.md |
 
 ---
 
