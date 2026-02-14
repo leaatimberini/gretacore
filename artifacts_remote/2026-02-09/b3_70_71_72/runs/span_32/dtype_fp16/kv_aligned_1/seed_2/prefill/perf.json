@@ -1,9 +1,0 @@
-{
-  "span": 32,
-  "dtype": "fp16",
-  "kv_aligned": 1,
-  "seed": 2,
-  "mode": "prefill",
-  "wall_time_sec": 40.630693133,
-  "logits_gz_bytes": 4919006
-}

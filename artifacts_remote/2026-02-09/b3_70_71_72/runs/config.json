@@ -1,9 +1,0 @@
-{
-  "spans": [32, 128, 512],
-  "dtypes": ["bf16", "fp16"],
-  "kv_aligned": [0, 1],
-  "seeds": [0, 1, 2],
-  "description": "B3.70-71-72 sweep: drift + span + dtype",
-  "timestamp": "2026-02-09T05:26:38Z",
-  "git_commit": "a6f7107"
-}

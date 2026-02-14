@@ -112,3 +112,8 @@ tmp/
 artifacts_remote/
 tmp/
 
+
+# Inference builds
+tools/inference/build_*/
+
+*.tgz
