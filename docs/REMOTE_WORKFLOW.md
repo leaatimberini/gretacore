@@ -38,16 +38,15 @@ Stage only intended files (docs/source/scripts). Never add large run artifacts.
 
 Canonical runner:
 
-  bash tools/benchmarks/remote_b3_89_executor.sh \
-  --date 2026-02-12 \
-  --variants "baseline,v3,v4" \
-  --contexts "4096,8192,16384" \
-  --repeat "4096:2,8192:1,16384:1" \
-  --single-shot
+```bash
+B3_89_MODE=perf ./tools/benchmarks/remote_b3_89_executor.sh \
+    2026-02-14 "baseline,v3" "4096,8192" "4096:2,8192:1" \
+    2>&1 | tee /tmp/b3_89_remote.log
+```
 
-If monitoring on the remote node:
-  tail -f /tmp/b3_89_remote.log
-
+Environment variable `B3_89_MODE` controls kernel serialization:
+- `perf` (default) — no serialization, fast runs for real measurements.
+- `debug` — `HIP_LAUNCH_BLOCKING=1`, `AMD_SERIALIZE_KERNEL=3`, `HSA_ENABLE_SDMA=0`.
 
 ## 4) Verification
 
@@ -63,37 +62,71 @@ Executor runtime seq-len (must be CTX+2):
 GGUF context length (should be 32768):
   python3 -c 'import gguf; r=gguf.GGUFReader("models/greta-v1.gguf"); print(r.fields["llama.context_length"].parts[-1][0])'
 
-## 5) Progress / Heartbeat
+## 5) Monitoring
 
-The remote executor (`remote_b3_89_executor.sh`) emits structured log lines so you
-can monitor long-running benchmark suites without instrumenting the binary.
+The executor emits **single-line JSON events** to stdout (and the tee'd log file)
+for every significant lifecycle point. These are machine-parseable and always
+contain `"event"`, `"ts"`, `"mode"`, and context fields.
 
-### Watching live progress
+### Live tail
 
 ```bash
 tail -f /tmp/b3_89_remote.log
 ```
 
-Or filter for specific events:
+### Filter specific event types
 
 ```bash
-grep HEARTBEAT /tmp/b3_89_remote.log | tail
-grep 'SUITE '    /tmp/b3_89_remote.log | tail
+# All heartbeats:
+grep '"event":"HEARTBEAT"' /tmp/b3_89_remote.log | tail
+
+# All completed tests:
+grep '"event":"TEST_END"' /tmp/b3_89_remote.log
+
+# Human-readable progress lines only:
+grep '^PROGRESS:' /tmp/b3_89_remote.log | tail
 ```
 
-### Log line glossary
+### Compact summary table
 
-| Prefix        | Meaning |
-|---------------|---------|
-| `START`       | A single test run is about to begin. Shows variant, ctx, run index and timeout budget. |
-| `HEARTBEAT`   | Emitted every ~60 s while a test is running. Shows elapsed time and a snapshot of GPU utilization and VRAM usage via `rocm-smi` (falls back to `NA` if unavailable). |
-| `PROGRESS`    | Accompanies each heartbeat. Shows estimated % completion of the **current test** based on elapsed time vs. the timeout budget for that context length. |
-| `SUITE_START` | Printed once at the beginning with the total number of test runs in the suite. |
-| `SUITE`       | Printed after every completed test run. Shows a progress bar with global suite completion (tests done / total) and the exit code of the last run. |
+```bash
+# One-shot (after run completes):
+python3 tools/benchmarks/parse_b3_89_events.py /tmp/b3_89_remote.log
 
-### Caveats
+# Live (refreshes every 2s, Ctrl-C to stop):
+python3 tools/benchmarks/parse_b3_89_events.py /tmp/b3_89_remote.log --follow
+```
 
-- The per-test `PROGRESS` percentage is an **estimate** based on the timeout budget
-  (e.g. 3 h for ctx 4096). The real completion % would require instrumenting the binary
-  (`greta_infer`), which is deliberately out of scope for this change.
-- If `rocm-smi` is not installed or fails, GPU metrics gracefully fall back to `NA`.
+### JSON event glossary
+
+| Event         | When emitted | Key fields |
+|---------------|-------------|------------|
+| `SUITE_START` | Once at start | `total_tests`, `variants`, `contexts`, `repeat_map` |
+| `TEST_START`  | Before each `greta_infer` invocation | `variant`, `ctx`, `run_idx`, `test_index`, `timeout_s` |
+| `HEARTBEAT`   | Every ~60 s while `greta_infer` is running | `elapsed_s`, `est_pct`, `gpu_use`, `vram_used`, `eta_remaining_s`, `suite_eta_s`, `pid` |
+| `TEST_END`    | After each run completes | `exit_code`, `exit_status`, `wall_s`, `prefill_s`, `attn_impl`, `model_load_s`, `decode_s` |
+| `SUITE_END`   | Once when entire suite finishes | `completed`, `suite_wall_s` |
+
+### Human-readable progress
+
+Lines prefixed with `PROGRESS:` are single-line, never-wrapping progress bars:
+
+```
+PROGRESS: [################..............] 53% (8/15) DONE variant=v3 ctx=8192 run=1 exit=0 wall=1024.1s | ETA 17m
+```
+
+### ETA estimation
+
+After the first successful run of a given (variant, ctx), the executor estimates
+remaining time based on the median wall time of completed runs for that ctx.
+The `eta_remaining_s` field in HEARTBEAT events shows per-ctx ETA; `suite_eta_s`
+shows an estimate for the full suite.
+
+### Diagnostics (Exit 137 / OOM)
+
+If a run exits non-zero or `PERF_TIMING` is missing, a `diag.txt` is written to
+the run directory with:
+- `dmesg` filtered for OOM/cgroup/killed
+- `free -h`
+- `rocm-smi` snapshot
+- Last 80 lines of `run.log`

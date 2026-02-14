@@ -8,26 +8,83 @@
 #   B3_89_MODE=perf|debug  (default: perf)
 #     perf  — no serialization env vars; fast runs for real measurements.
 #     debug — HIP_LAUNCH_BLOCKING=1, AMD_SERIALIZE_KERNEL=3, HSA_ENABLE_SDMA=0.
+#
+# Observability:
+#   The script emits single-line JSON events to stdout/log for machine parsing:
+#     SUITE_START, TEST_START, HEARTBEAT, TEST_END, SUITE_END
+#   Human-readable lines are prefixed with "PROGRESS:" and never wrap.
+#   Use tools/benchmarks/parse_b3_89_events.py to build a live summary table.
 # =============================================================================
 set -euo pipefail
 
 # ---------------------------------------------------------------------------
-# Progress / Heartbeat helpers  (added for B3.89 observability)
+# Core helpers
 # ---------------------------------------------------------------------------
-ts() { date -Is; }
+ts() { date -u +"%Y-%m-%dT%H:%M:%SZ"; }
+epoch_s() { date +%s; }
 
-progress_bar() {
-    local cur=$1 total=$2 width=${3:-30}
-    local pct=0
+# ---------------------------------------------------------------------------
+# JSON event emitter — single line, no unescaped newlines
+# ---------------------------------------------------------------------------
+emit_event() {
+    local event_type="$1"; shift
+    # Build JSON fields from key=value pairs passed as arguments
+    local json="{"
+    json+="\"event\":\"${event_type}\""
+    json+=",\"ts\":\"$(ts)\""
+    json+=",\"mode\":\"${B3_89_MODE:-perf}\""
+    while (( $# )); do
+        local kv="$1"; shift
+        local key="${kv%%=*}"
+        local val="${kv#*=}"
+        # Auto-detect numeric vs string
+        if [[ "$val" =~ ^-?[0-9]+\.?[0-9]*$ ]]; then
+            json+=",\"${key}\":${val}"
+        else
+            # Escape double quotes and backslashes in value
+            val="${val//\\/\\\\}"
+            val="${val//\"/\\\"}"
+            json+=",\"${key}\":\"${val}\""
+        fi
+    done
+    json+="}"
+    echo "$json"
+}
+
+# ---------------------------------------------------------------------------
+# GPU snapshot helper (rocm-smi with fallback)
+# ---------------------------------------------------------------------------
+gpu_snapshot() {
+    local gpu_use="NA" vram="NA"
+    if command -v rocm-smi &>/dev/null; then
+        gpu_use=$(rocm-smi --showuse 2>/dev/null | grep -oP '\d+%' | head -1 || echo "NA")
+        vram=$(rocm-smi --showmeminfo vram 2>/dev/null \
+               | grep -i 'used' | head -1 | awk '{print $NF}' || echo "NA")
+    fi
+    echo "${gpu_use}|${vram}"
+}
+
+# ---------------------------------------------------------------------------
+# Human-readable progress bar (single line, prefixed PROGRESS:)
+# ---------------------------------------------------------------------------
+print_progress() {
+    local cur=$1 total=$2 label="$3" eta_str="${4:-}"
+    local width=30 pct=0
     if (( total > 0 )); then pct=$(( cur * 100 / total )); fi
     local filled=$(( width * cur / (total > 0 ? total : 1) ))
     local empty=$(( width - filled ))
-    printf '[%s%s] %d%% (%d/%d)' \
-        "$(printf '#%.0s' $(seq 1 $filled 2>/dev/null))" \
-        "$(printf '.%.0s' $(seq 1 $empty  2>/dev/null))" \
-        "$pct" "$cur" "$total"
+    local bar
+    bar="$(printf '#%.0s' $(seq 1 $filled 2>/dev/null))$(printf '.%.0s' $(seq 1 $empty 2>/dev/null))"
+    if [ -n "$eta_str" ]; then
+        printf 'PROGRESS: [%s] %3d%% (%d/%d) %s | ETA %s\n' "$bar" "$pct" "$cur" "$total" "$label" "$eta_str"
+    else
+        printf 'PROGRESS: [%s] %3d%% (%d/%d) %s\n' "$bar" "$pct" "$cur" "$total" "$label"
+    fi
 }
 
+# ---------------------------------------------------------------------------
+# Timeout budget per context length
+# ---------------------------------------------------------------------------
 ctx_timeout_s() {
     case "$1" in
         4096)  echo 10800  ;;  # 3 h
@@ -39,45 +96,43 @@ ctx_timeout_s() {
     esac
 }
 
-heartbeat() {
-    local variant=$1 ctx=$2 run_idx=$3 elapsed_s=$4
-    local gpu_use="NA" vram="NA"
-    if command -v rocm-smi &>/dev/null; then
-        gpu_use=$(rocm-smi --showuse 2>/dev/null | grep -oP '\d+%' | head -1 || echo "NA")
-        vram=$(rocm-smi --showmeminfo vram 2>/dev/null \
-               | grep -i 'used' | head -1 | awk '{print $NF}' || echo "NA")
-    fi
-    echo "$(ts) HEARTBEAT variant=${variant} ctx=${ctx} run=${run_idx} elapsed_s=${elapsed_s} gpu_use=${gpu_use} vram_used=${vram}"
+# ---------------------------------------------------------------------------
+# ETA tracking
+#   _ETA_WALL_SAMPLES[variant:ctx] = "wall1 wall2 wall3"  (space-separated)
+# ---------------------------------------------------------------------------
+declare -A _ETA_WALL_SAMPLES 2>/dev/null || true
+
+record_wall_sample() {
+    local key="$1:$2"  # variant:ctx
+    local wall="$3"
+    _ETA_WALL_SAMPLES["$key"]="${_ETA_WALL_SAMPLES[$key]:-} $wall"
 }
 
-run_with_progress() {
-    local timeout_s=$1; shift
-    # Run command in background
-    "$@" &
-    local bg_pid=$!
-    local start_epoch
-    start_epoch=$(date +%s)
-    while kill -0 "$bg_pid" 2>/dev/null; do
-        sleep 5
-        local now_epoch
-        now_epoch=$(date +%s)
-        local elapsed=$(( now_epoch - start_epoch ))
-        if (( elapsed % 60 < 6 )); then  # fires ~every 60s (within the 5s sleep window)
-            heartbeat "${_RWP_VARIANT:-?}" "${_RWP_CTX:-?}" "${_RWP_RUN:-?}" "$elapsed"
-            local est_pct=0
-            if (( timeout_s > 0 )); then
-                est_pct=$(( elapsed * 100 / timeout_s ))
-                if (( est_pct > 99 )); then est_pct=99; fi
-            fi
-            echo "$(ts) PROGRESS test_est=${est_pct}% elapsed=${elapsed}s budget=${timeout_s}s"
-        fi
-    done
-    wait "$bg_pid" 2>/dev/null
-    return $?
+# Compute median of space-separated numbers
+_median() {
+    local nums
+    IFS=' ' read -ra nums <<< "$1"
+    local sorted
+    sorted=($(printf '%s\n' "${nums[@]}" | sort -n))
+    local n=${#sorted[@]}
+    if (( n == 0 )); then echo 0; return; fi
+    echo "${sorted[$(( n / 2 ))]}"
+}
+
+# Estimate remaining seconds for a variant:ctx given completed count & total reps
+eta_for_ctx() {
+    local variant="$1" ctx="$2" done_count="$3" total_reps="$4"
+    local key="${variant}:${ctx}"
+    local samples="${_ETA_WALL_SAMPLES[$key]:-}"
+    if [ -z "$samples" ]; then echo "-1"; return; fi
+    local med
+    med=$(_median "$samples")
+    local remaining=$(( total_reps - done_count ))
+    echo $(( ${med%.*} * remaining ))
 }
 
 # ---------------------------------------------------------------------------
-# Diagnostics helper — called on non-zero exit
+# Diagnostics helper — called on non-zero exit or missing PERF_TIMING
 # ---------------------------------------------------------------------------
 collect_diag() {
     local out_dir=$1 exit_code=$2 run_log=$3
@@ -109,9 +164,86 @@ collect_diag() {
     echo "$(ts) DIAG written to $diag"
 }
 
+# ---------------------------------------------------------------------------
+# run_with_heartbeat — runs CMD in background, emits HEARTBEAT JSON every 60s
+# ---------------------------------------------------------------------------
+run_with_heartbeat() {
+    local timeout_s=$1; shift
+    # Run command in background
+    "$@" &
+    local bg_pid=$!
+    local start_epoch
+    start_epoch=$(epoch_s)
+    local last_hb=0
+
+    while kill -0 "$bg_pid" 2>/dev/null; do
+        sleep 5
+        local now_epoch
+        now_epoch=$(epoch_s)
+        local elapsed=$(( now_epoch - start_epoch ))
+
+        # Emit heartbeat every ~60s
+        if (( elapsed - last_hb >= 60 )); then
+            last_hb=$elapsed
+            local snap
+            snap=$(gpu_snapshot)
+            local gpu_use="${snap%%|*}"
+            local vram="${snap##*|}"
+
+            local est_pct=0
+            if (( timeout_s > 0 )); then
+                est_pct=$(( elapsed * 100 / timeout_s ))
+                if (( est_pct > 99 )); then est_pct=99; fi
+            fi
+
+            # Per-ctx ETA
+            local ctx_eta=-1
+            local _reps_total
+            _reps_total=$(get_reps "${_RWP_CTX:-0}")
+            ctx_eta=$(eta_for_ctx "${_RWP_VARIANT:-?}" "${_RWP_CTX:-0}" "${_RWP_DONE_THIS_CTX:-0}" "$_reps_total")
+
+            # Suite ETA = remaining tests * median of this ctx (rough)
+            local suite_eta=-1
+            if (( ctx_eta >= 0 )); then
+                local remaining_suite=$(( TOTAL_TESTS - TEST_INDEX ))
+                suite_eta=$(( ctx_eta + (remaining_suite - (_reps_total - ${_RWP_DONE_THIS_CTX:-0})) * ${ctx_eta:-0} / (_reps_total - ${_RWP_DONE_THIS_CTX:-0} > 0 ? _reps_total - ${_RWP_DONE_THIS_CTX:-0} : 1) ))
+            fi
+
+            emit_event "HEARTBEAT" \
+                "variant=${_RWP_VARIANT:-?}" \
+                "ctx=${_RWP_CTX:-0}" \
+                "run_idx=${_RWP_RUN:-0}" \
+                "test_index=${TEST_INDEX}" \
+                "total_tests=${TOTAL_TESTS}" \
+                "pid=${bg_pid}" \
+                "elapsed_s=${elapsed}" \
+                "timeout_s=${timeout_s}" \
+                "est_pct=${est_pct}" \
+                "gpu_use=${gpu_use}" \
+                "vram_used=${vram}" \
+                "eta_remaining_s=${ctx_eta}" \
+                "suite_eta_s=${suite_eta}"
+
+            # Human-readable line
+            local eta_label=""
+            if (( ctx_eta >= 0 )); then
+                eta_label="ctx:$(( ctx_eta / 60 ))m suite:$(( suite_eta / 60 ))m"
+            fi
+            print_progress "$TEST_INDEX" "$TOTAL_TESTS" \
+                "variant=${_RWP_VARIANT:-?} ctx=${_RWP_CTX:-?} run=${_RWP_RUN:-?} elapsed=${elapsed}s ${est_pct}%" \
+                "$eta_label"
+        fi
+    done
+    wait "$bg_pid" 2>/dev/null
+    return $?
+}
+
+# ===========================================================================
 # Global suite progress counters
+# ===========================================================================
 TOTAL_TESTS=0
 TEST_INDEX=0
+SUITE_START_EPOCH=0
 
 DATE=$1
 VARIANTS=$2  # Comma separated: v3,v4,baseline
@@ -136,18 +268,16 @@ cd /root/gretacore
 export GRETA_VERBOSE_INFO=1
 
 if [ "$B3_89_MODE" = "debug" ]; then
-    # Debug/determinism env vars — forces kernel serialization (very slow)
     export HIP_LAUNCH_BLOCKING=1
     export AMD_SERIALIZE_KERNEL=3
     export HSA_ENABLE_SDMA=0
 else
-    # Perf mode — unset any inherited serialization flags
     unset HIP_LAUNCH_BLOCKING 2>/dev/null || true
     unset AMD_SERIALIZE_KERNEL 2>/dev/null || true
     unset HSA_ENABLE_SDMA 2>/dev/null || true
 fi
 
-# VRAM sampling interval: 1s for debug, 10s for perf (reduces overhead)
+# VRAM sampling interval: 1s for debug, 10s for perf
 VRAM_SAMPLE_INTERVAL=10
 if [ "$B3_89_MODE" = "debug" ]; then
     VRAM_SAMPLE_INTERVAL=1
@@ -183,7 +313,6 @@ echo "================================================================="
 get_reps() {
     local ctx=$1
     local reps=1
-    # Parse REPEAT_MAP
     IFS=',' read -ra PAIRS <<< "$REPEAT_MAP"
     for pair in "${PAIRS[@]}"; do
         if [[ "$pair" == "$ctx:"* ]]; then
@@ -213,12 +342,30 @@ else
 fi
 
 IFS=',' read -ra VAR_LIST <<< "$VARIANTS"
+
+# ---------------------------------------------------------------------------
+# Compute TOTAL_TESTS upfront for all variants × contexts × reps
+# ---------------------------------------------------------------------------
+IFS=',' read -ra _ALL_CTX <<< "$CONTEXTS"
+for _v in "${VAR_LIST[@]}"; do
+    for _tc in "${_ALL_CTX[@]}"; do
+        TOTAL_TESTS=$(( TOTAL_TESTS + $(get_reps "$_tc") ))
+    done
+done
+SUITE_START_EPOCH=$(epoch_s)
+emit_event "SUITE_START" \
+    "total_tests=${TOTAL_TESTS}" \
+    "variants=${VARIANTS}" \
+    "contexts=${CONTEXTS}" \
+    "repeat_map=${REPEAT_MAP}"
+print_progress 0 "$TOTAL_TESTS" "suite starting"
+
 for VARIANT in "${VAR_LIST[@]}"; do
     echo "=== Processing Variant: $VARIANT ==="
-    
+
     BUILD_DIR="tools/inference/build_$VARIANT"
     mkdir -p "$BUILD_DIR"
-    
+
     # Configure CMake flags
     CMAKE_FLAGS=""
     if [ "$VARIANT" == "v3" ]; then
@@ -228,9 +375,8 @@ for VARIANT in "${VAR_LIST[@]}"; do
     elif [ "$VARIANT" == "baseline" ]; then
         CMAKE_FLAGS="" # No special flags
     fi
-    
-    # Build
-    # Always rebuild to ensure fresh binaries
+
+    # Build — always rebuild to ensure fresh binaries
     echo "Building $VARIANT in $BUILD_DIR..."
     pushd "$BUILD_DIR" > /dev/null
     rm -f CMakeCache.txt build_passed.flag
@@ -249,7 +395,7 @@ for VARIANT in "${VAR_LIST[@]}"; do
         continue
     fi
     popd > /dev/null
-    
+
     # Resource Dump & Gate (Only for opt variants)
     if [ "$VARIANT" != "baseline" ]; then
         if [ -f "$RUN_ROOT/${VARIANT}_gate_passed.flag" ] && [ "${FORCE:-0}" != "1" ]; then
@@ -264,46 +410,41 @@ for VARIANT in "${VAR_LIST[@]}"; do
                 cat "$RUN_ROOT/${VARIANT}_gate.log"
                 continue
             fi
-            
+
             # Save resource dump
             tools/benchmarks/b3_89_dump_kernel_resources.sh "$CMAKE_FLAGS" > "$RUN_ROOT/${VARIANT}_resources.txt"
         fi
     fi
-    
+
     # Execute Contexts
     IFS=',' read -ra CTX_LIST <<< "$CONTEXTS"
-
-    # --- Compute TOTAL_TESTS once (first variant) ---
-    if (( TOTAL_TESTS == 0 )); then
-        for _tc in "${CTX_LIST[@]}"; do
-            TOTAL_TESTS=$(( TOTAL_TESTS + $(get_reps "$_tc") ))
-        done
-        TOTAL_TESTS=$(( TOTAL_TESTS * ${#VAR_LIST[@]} ))
-        echo "$(ts) SUITE_START total_tests=${TOTAL_TESTS}"
-    fi
 
     for CTX in "${CTX_LIST[@]}"; do
         REPS=$(get_reps "$CTX")
         echo "Running $VARIANT at Context $CTX for $REPS repetitions..."
-        
+
         # Generate Prompt
         python3 -c "print('a' * ($CTX - 1))" > /tmp/prompt.txt
-        
+
         # Set GRETA_MAX_SEQ_LEN to CTX+2 to account for tokenization overhead
-        # The tokenizer produces CTX+2 tokens for (CTX-1) chars with v3/v4 attention
         export GRETA_MAX_SEQ_LEN=$((CTX + 2))
         echo "GRETA_MAX_SEQ_LEN=$GRETA_MAX_SEQ_LEN"
-        
+
+        # Track how many runs of this ctx completed (for ETA)
+        _DONE_THIS_CTX=0
+
         for i in $(seq 0 $((REPS-1))); do
             OUT_DIR="$RUN_ROOT/${VARIANT}/ctx_${CTX}_run${i}"
             if [ -f "$OUT_DIR/perf.json" ] && grep -q '"exit_status": "OK"' "$OUT_DIR/perf.json" && [ "${FORCE:-0}" != "1" ]; then
                 echo "  Run $i already exists, skipping..."
+                TEST_INDEX=$(( TEST_INDEX + 1 ))
+                _DONE_THIS_CTX=$(( _DONE_THIS_CTX + 1 ))
                 continue
             fi
             mkdir -p "$OUT_DIR"
-            
+
             echo "  Run $i (including VRAM sampling)..."
-            
+
             # Start VRAM sampling in background (interval depends on mode)
             rocm-smi --showmeminfo vram --json > "$OUT_DIR/vram_before.json" 2>&1 || true
             (
@@ -314,15 +455,26 @@ for VARIANT in "${VAR_LIST[@]}"; do
                 done
             ) &
             SMI_PID=$!
-            
-            # Allow failure to capture log
+
             CTX_TIMEOUT_S="$(ctx_timeout_s "$CTX")"
-            echo "$(ts) START variant=${VARIANT} ctx=${CTX} run=${i} timeout_s=${CTX_TIMEOUT_S} mode=${B3_89_MODE}"
+
+            # --- TEST_START event ---
+            emit_event "TEST_START" \
+                "variant=${VARIANT}" \
+                "ctx=${CTX}" \
+                "run_idx=${i}" \
+                "test_index=${TEST_INDEX}" \
+                "total_tests=${TOTAL_TESTS}" \
+                "timeout_s=${CTX_TIMEOUT_S}"
+            print_progress "$TEST_INDEX" "$TOTAL_TESTS" \
+                "START variant=${VARIANT} ctx=${CTX} run=${i} budget=${CTX_TIMEOUT_S}s"
+
             # Export context for heartbeat helper
             export _RWP_VARIANT="$VARIANT" _RWP_CTX="$CTX" _RWP_RUN="$i"
+            export _RWP_DONE_THIS_CTX="$_DONE_THIS_CTX"
             set +e
             START=$(date +%s.%N)
-            run_with_progress "$CTX_TIMEOUT_S" \
+            run_with_heartbeat "$CTX_TIMEOUT_S" \
                 timeout -k 30s "${CTX_TIMEOUT_S}s" \
                 ./$BUILD_DIR/greta_infer \
                     --model ./models/greta-v1.gguf \
@@ -332,32 +484,43 @@ for VARIANT in "${VAR_LIST[@]}"; do
             EXIT_STATUS=$?
             set -e
             END=$(date +%s.%N)
-            
-            kill $SMI_PID || true
+
+            kill $SMI_PID 2>/dev/null || true
+            wait $SMI_PID 2>/dev/null || true
             rocm-smi --showmeminfo vram --json > "$OUT_DIR/vram_after.json" 2>&1 || true
-            
-            WALL=$(echo "$(date +%s.%N) - $START" | bc)
-            
+
+            WALL=$(echo "$END - $START" | bc)
+
             STATUS_STR="OK"
-            if [ $EXIT_STATUS -ne 0 ]; then 
+            if [ $EXIT_STATUS -ne 0 ]; then
                 STATUS_STR="FAIL"
                 echo "CRITICAL: Run $i crashed (Exit $EXIT_STATUS)"
                 tail -n 30 "$OUT_DIR/run.log"
-                # --- Exit 137 / OOM diagnostics ---
                 collect_diag "$OUT_DIR" "$EXIT_STATUS" "$OUT_DIR/run.log"
             fi
-            
+
             # Check for prompt tokens in log
             PROMPT_TOKENS=$(grep "Prompt tokens:" "$OUT_DIR/run.log" | sed 's/.*Prompt tokens: //' | sed 's/ .*//' || echo "NOT_FOUND")
             echo "  Prompt tokens: $PROMPT_TOKENS"
-            
+
             TIMINGS=$(grep "\[PERF_TIMING\]" "$OUT_DIR/run.log" | sed 's/\[PERF_TIMING\] //' || echo "{}")
-            
-            # Guardrail: Check for silent failure (0 prefill or missing json)
+
+            # Extract individual timing fields for TEST_END event
+            _prefill_s=""
+            _attn_impl=""
+            _model_load_s=""
+            _decode_s=""
+            if [ -n "$TIMINGS" ] && [ "$TIMINGS" != "{}" ]; then
+                _prefill_s=$(echo "$TIMINGS" | grep -oP '"prefill_s":\K[0-9.e+-]+' || true)
+                _attn_impl=$(echo "$TIMINGS" | grep -oP '"attn_impl":"\K[^"]+' || true)
+                _model_load_s=$(echo "$TIMINGS" | grep -oP '"model_load_s":\K[0-9.e+-]+' || true)
+                _decode_s=$(echo "$TIMINGS" | grep -oP '"decode_s":\K[0-9.e+-]+' || true)
+            fi
+
+            # Guardrail: Check for silent failure
             if [ -z "$TIMINGS" ] || [ "$TIMINGS" == "{}" ]; then
                  echo "CRITICAL: Missing performance timings in run log!"
                  STATUS_STR="FAIL"
-                 # Capture diagnostics if not already written (exit was 0 but PERF_TIMING missing)
                  if [ ! -f "$OUT_DIR/diag.txt" ]; then
                      collect_diag "$OUT_DIR" "$EXIT_STATUS" "$OUT_DIR/run.log"
                  fi
@@ -367,7 +530,7 @@ for VARIANT in "${VAR_LIST[@]}"; do
                  tail -n 20 "$OUT_DIR/run.log"
                  STATUS_STR="FAIL"
             fi
-            
+
             cat > "$OUT_DIR/perf.json" << EOT
 {
   "ticket": "b3_89",
@@ -380,12 +543,55 @@ for VARIANT in "${VAR_LIST[@]}"; do
   "timings": $TIMINGS
 }
 EOT
-            # --- Suite progress ---
+
+            # Record wall sample for ETA (only OK runs)
+            if [ "$STATUS_STR" = "OK" ]; then
+                record_wall_sample "$VARIANT" "$CTX" "${WALL%.*}"
+            fi
+            _DONE_THIS_CTX=$(( _DONE_THIS_CTX + 1 ))
+
+            # --- TEST_END event ---
             TEST_INDEX=$(( TEST_INDEX + 1 ))
-            echo "$(ts) SUITE $(progress_bar $TEST_INDEX $TOTAL_TESTS) last_exit=${EXIT_STATUS} last_ctx=${CTX} last_variant=${VARIANT}"
+            _suite_elapsed=$(( $(epoch_s) - SUITE_START_EPOCH ))
+            emit_event "TEST_END" \
+                "variant=${VARIANT}" \
+                "ctx=${CTX}" \
+                "run_idx=${i}" \
+                "test_index=${TEST_INDEX}" \
+                "total_tests=${TOTAL_TESTS}" \
+                "exit_code=${EXIT_STATUS}" \
+                "exit_status=${STATUS_STR}" \
+                "wall_s=${WALL}" \
+                "prefill_s=${_prefill_s:-NA}" \
+                "attn_impl=${_attn_impl:-NA}" \
+                "model_load_s=${_model_load_s:-NA}" \
+                "decode_s=${_decode_s:-NA}" \
+                "suite_elapsed_s=${_suite_elapsed}"
+
+            # Compute suite-level ETA for progress line
+            _avg_per_test=0; _suite_eta_str=""
+            if (( TEST_INDEX > 0 )); then
+                _avg_per_test=$(( _suite_elapsed / TEST_INDEX ))
+                _remaining_tests=$(( TOTAL_TESTS - TEST_INDEX ))
+                _suite_eta_s=$(( _avg_per_test * _remaining_tests ))
+                _suite_eta_str="$(( _suite_eta_s / 60 ))m"
+            fi
+            print_progress "$TEST_INDEX" "$TOTAL_TESTS" \
+                "DONE variant=${VARIANT} ctx=${CTX} run=${i} exit=${EXIT_STATUS} wall=${WALL}s" \
+                "$_suite_eta_str"
         done
     done
 done
+
+# ---------------------------------------------------------------------------
+# SUITE_END event
+# ---------------------------------------------------------------------------
+_SUITE_WALL=$(( $(epoch_s) - SUITE_START_EPOCH ))
+emit_event "SUITE_END" \
+    "total_tests=${TOTAL_TESTS}" \
+    "completed=${TEST_INDEX}" \
+    "suite_wall_s=${_SUITE_WALL}"
+print_progress "$TEST_INDEX" "$TOTAL_TESTS" "SUITE COMPLETE in $(( _SUITE_WALL / 60 ))m${_SUITE_WALL}s"
 
 # Generate Summary JSON
 echo "Generating summary.json..."
@@ -413,12 +619,12 @@ for var in variants:
             parts = ctx_dir.split('_')
             ctx = int(parts[1])
         except: continue
-        
+
         perf_path = os.path.join(var_dir, ctx_dir, 'perf.json')
         if os.path.exists(perf_path):
             with open(perf_path, 'r') as f:
                 data = json.load(f)
-            
+
             if ctx not in results[var]: results[var][ctx] = []
             results[var][ctx].append(data)
 
@@ -454,7 +660,7 @@ for var, contexts in results.items():
         # Sort and discard warmup
         runs.sort(key=lambda x: x.get('repetition', 0))
         if len(runs) > 1: runs = runs[1:]
-        
+
         prefills = []
         peak_vrams = []
         for r in runs:
@@ -463,7 +669,7 @@ for var, contexts in results.items():
                 prefills.append(t["prefill_s"])
             else:
                 prefills.append(r.get("wall_time_sec", 0))
-            
+
             # Simple peak VRAM heuristic: check vram_after.json
             rep_idx = r.get('repetition', 0)
             ctx_run_dir = os.path.join(run_root, var, f"ctx_{ctx}_run{rep_idx}")
@@ -472,17 +678,16 @@ for var, contexts in results.items():
                 try:
                     with open(vram_after, 'r') as vf:
                         vjson = json.load(vf)
-                        # SMI json structure varies, usually card_0 or similar
                         for key in vjson:
                             if "VRAM" in vjson[key]:
                                 peak_vrams.append(vjson[key]["VRAM Used"])
                 except: pass
-        
+
         if not prefills: continue
-        
+
         data_pts = prefills[1:] if len(prefills) > 1 else prefills
         median_p = sorted(data_pts)[len(data_pts)//2]
-        
+
         summary["variants"][var][ctx] = {
             "prefill_median_s": median_p,
             "speedup": baseline_ref.get(ctx, 0) / median_p if median_p > 0 else 0,
