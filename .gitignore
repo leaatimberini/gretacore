@@ -65,13 +65,9 @@ Makefile
 artifacts/
 artifacts/**/
 
-# Ignore remote artifacts by default
+# Remote Artifacts: Ignore all content but allow specific reports
 artifacts_remote/*
-
-# Allow traversing directories to find exceptions
 !artifacts_remote/
-
-# Exceptions: Reports and summaries
 !artifacts_remote/**/b3_*_analysis.txt
 !artifacts_remote/**/report_*.md
 !artifacts_remote/**/summary.json
@@ -104,16 +100,10 @@ models/
 tmp/
 
 # -----------------------------------------------------------------------------
-# 6. EXCEPCIONES
+# 6. EXCEPCIONES Y OTROS
 # -----------------------------------------------------------------------------
 *_workspace_rules.md
-
-# Local artifacts / scratch
-artifacts_remote/
-tmp/
-
+*.tgz
 
 # Inference builds
 tools/inference/build_*/
-
-*.tgz
