@@ -38,14 +38,16 @@ Stage only intended files (docs/source/scripts). Never add large run artifacts.
 
 Canonical runner:
 
-  bash tools/benchmarks/run_b3_89_prefill_microbench.sh 129.212.184.200 \
-    --date 2026-02-12 \
-    --variants "baseline,v3,v4" --single-shot \
-    --contexts "4096,8192,16384" \
-    --repeat "4096:2,8192:1,16384:1"
+  bash tools/benchmarks/remote_b3_89_executor.sh \
+  --date 2026-02-12 \
+  --variants "baseline,v3,v4" \
+  --contexts "4096,8192,16384" \
+  --repeat "4096:2,8192:1,16384:1" \
+  --single-shot
 
 If monitoring on the remote node:
   tail -f /tmp/b3_89_remote.log
+
 
 ## 4) Verification
 
@@ -59,4 +61,4 @@ Executor runtime seq-len (must be CTX+2):
   grep -n "GRETA_MAX_SEQ_LEN" tools/benchmarks/remote_b3_89_executor.sh
 
 GGUF context length (should be 32768):
-  python3 -c 'import gguf; l=gguf.GGUFLoader("models/greta-v1.gguf"); print(l.get_meta().get("llama.context_length"))'
+  python3 -c 'import gguf; r=gguf.GGUFReader("models/greta-v1.gguf"); print(r.fields["llama.context_length"].parts[-1][0])'
