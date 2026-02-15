@@ -9,7 +9,10 @@ This document tracking the evolution and final results of the B3.89 prefill micr
 ### Configuration
 - **Mode:** `perf` (Debug flags unset)
 - **Determinism:** Enabled
-- **Kernel Implementation:** `flash_v2_naive` (Baseline, v3, v4 variants)
+- **Kernel Implementation:**
+  - `baseline`: `flash_v2_naive`
+  - `v3`: `v3_q_lds`
+  - `v4`: `v4_ql_v_lds`
 - **Node:** MI300X Phase 5 (8x GPUs)
 
 ### Consolidated Results (Prefill Median Latency)
