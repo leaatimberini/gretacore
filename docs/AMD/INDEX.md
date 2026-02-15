@@ -19,11 +19,14 @@
 
 ## Reports by Date
 
-### 2026-02-13 (Latest)
+### 2026-02-14 (Latest)
 
 | ID | Report | Status | Artifacts |
 |----|--------|--------|-----------|
-| B3.89 | Prefill Microbench Closeout | ✅ COMPLETED | [`2026_02_12_B3_89_prefill_microbench_closeout.md`](./2026_02_12_B3_89_prefill_microbench_closeout.md) |
+| B3.89 | Prefill Microbench Closeout (Perf Mode) | ✅ COMPLETED | [`2026_02_14_B3_89_prefill_microbench_closeout.md`](./2026_02_14_B3_89_prefill_microbench_closeout.md) |
+
+### 2026-02-13
+
 
 ### 2026-02-07
 
