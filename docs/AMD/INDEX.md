@@ -3,7 +3,7 @@
 **Repository:** gretacore  
 **Branch:** `main`  
 **Last Updated:** 2026-02-15  
-**Total Reports:** 50
+**Total Reports:** 51
 
 ---
 
@@ -19,11 +19,13 @@
 
 ## Reports by Date
 
-### 2026-02-14 (Latest)
+### 2026-02-15 (Latest)
 
 | ID | Report | Status | Artifacts |
 |----|--------|--------|-----------|
-| B3.89 | Prefill Microbench Closeout (Perf Mode) | ✅ COMPLETED | [`2026_02_14_B3_89_prefill_microbench_closeout.md`](./2026_02_14_B3_89_prefill_microbench_closeout.md) |
+| B3.90 | Q-LDS vs Baseline RCA & Perf Analysis | ✅ COMPLETED | [`2026_02_15_B3_90_qlds_vs_baseline_rca.md`](./2026_02_15_B3_90_qlds_vs_baseline_rca.md) |
+
+### 2026-02-14
 
 ### 2026-02-13
 

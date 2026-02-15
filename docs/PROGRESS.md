@@ -52,6 +52,7 @@
 **B3.83**: COMPLETED - Long-Context Decode (32k) (TIMEOUT)
 **B3.84**: COMPLETED - High-Pressure Batch Decode (16k) (PASS; 110GB VRAM)
 **B3.89**: COMPLETED - Prefill Kernel Optimization V3/V4 (PASS; MI300X perf rerun; v4 speedup up to 1.78x vs v3; closeout: 2026-02-14)
+**B3.90**: COMPLETED - Q-LDS vs Baseline RCA (FAIL_REGRESSION; v4 is ~1.78x faster than v3 but ~5x slower than baseline; high-context instability detected)
 
 ---
 
@@ -113,6 +114,7 @@
 | B3.87 | 2026-02-10 | Decode TPS Decomposition | COMPLETED | PASS_RCA | -11.1% TPS delta | artifacts_remote/2026-02-10/b3_87/ | docs/AMD/2026_02_10_B3_87_decode_tps_decomposition.md |
 | B3.88 | 2026-02-10 | 32k Feasibility | COMPLETED | PASS_32K_FEASIBLE | 32k prefill achieved | artifacts_remote/2026-02-10/b3_88/ | docs/AMD/2026_02_10_B3_88_32k_feasibility.md |
 | B3.89 | 2026-02-14 | Prefill Kernel Optimization V3/V4 | COMPLETED | PASS | v4 improvement ~1.78x vs v3 in perf mode | artifacts_remote/B3_89_FINAL_REPORT.md | docs/AMD/2026_02_14_B3_89_prefill_microbench_closeout.md |
+| B3.90 | 2026-02-15 | Q-LDS vs Baseline RCA | COMPLETED | FAIL_REGRESSION | Q-LDS sync overhead; v4 improved but 5x slower than baseline | artifacts_remote/2026-02-15/b3_90/ | docs/AMD/2026_02_15_B3_90_qlds_vs_baseline_rca.md |
 
 ---
 
